@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Box.h"
+#include "memory/Memory.h"
 
 namespace Viry3D
 {
@@ -32,10 +33,11 @@ namespace Viry3D
 		void SetSkin(const String& skin);
       
     protected:
-       // virtual void FillSelfMeshes(Vector<ViewMesh>& meshes);
+		virtual void FillMeshes(Vector<Mesh2D>& meshes) override;
 
     private:
         Ref<Texture> m_texture;
 		String m_skin;
+		Rect m_grid;
     };
 }

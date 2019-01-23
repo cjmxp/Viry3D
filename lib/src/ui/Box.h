@@ -18,6 +18,7 @@
 #pragma once
 
 #include "graphics/Color.h"
+#include "graphics/VertexAttribute.h"
 #include "math/Vector2.h"
 #include "math/Vector2i.h"
 #include "math/Quaternion.h"
@@ -25,12 +26,33 @@
 #include "math/Matrix4x4.h"
 #include <functional>
 
-#define NAN 0.1f
+#define DEF 0.1f
+
 namespace Viry3D
 {
 	class CanvasRenderer;
 	struct ViewAlignment;
+	class Texture;
+	class Image;
+	class Box;
 
+	struct Mesh2D
+	{
+		Vector<Vertex> vertices;
+		Vector<unsigned short> indices;
+		Ref<Texture> texture;
+		Ref<Image> image;
+		Box* view = nullptr;
+		bool base_view = false;
+
+		bool HasTextureOrImage() const
+		{
+			return texture || image;
+		}
+
+		int GetTextureOrImageWidth() const;
+		int GetTextureOrImageHeight() const;
+	};
 
 	class Box
 	{
@@ -104,15 +126,16 @@ namespace Viry3D
         bool OnTouchDrag(const Vector2i& pos) const;
 	
     protected:
+		static const String AppRoot;
         void MarkCanvasDirty() const;
         void ComputeVerticesRectAndMatrix(Rect& rect, Matrix4x4& matrix);
-		float left{ NAN };
-		float top{ NAN };
-		float right{ NAN };
-		float bottom{ NAN };
-		float centerX{ NAN };
-		float centerY{ NAN };
-	private:
+		virtual void FillMeshes(Vector<Mesh2D>& meshes);
+		float left{ DEF };
+		float top{ DEF };
+		float right{ DEF };
+		float bottom{ DEF };
+		float centerX{ DEF };
+		float centerY{ DEF };
 		CanvasRenderer* m_canvas{ nullptr };
 		Box* m_parent{nullptr};
 		Vector<Ref<Box>> m_childs;

@@ -16,18 +16,32 @@
 */
 
 #include "Box.h"
+#include "Application.h"
 #include "CanvasRenderer.h"
 #include "Debug.h"
 #include "memory/Memory.h"
 #include "graphics/Camera.h"
 #include "graphics/Texture.h"
 
+
 namespace Viry3D
 {
+	
+	int Mesh2D::GetTextureOrImageWidth() const
+	{
+		return texture ? texture->GetWidth() : image->width;
+	}
+
+	int Mesh2D::GetTextureOrImageHeight() const
+	{
+		return texture ? texture->GetHeight() : image->height;
+	}
+
+	const String Box::AppRoot = Application::Instance()->GetDataPath();
 
 	Box::Box()
 	{
-	
+		
 	}
 
 	Box::~Box()
@@ -59,15 +73,6 @@ namespace Viry3D
         }
 
         return nullptr;
-    }
-
-    void Box::MarkCanvasDirty() const
-    {
-        CanvasRenderer* canvas = this->GetCanvas();
-        if (canvas)
-        {
-            canvas->MarkCanvasDirty();
-        }
     }
 
     void Box::AddChild(const Ref<Box>& view)
@@ -103,12 +108,6 @@ namespace Viry3D
         }
     }
 
-	
-	void Box::SetAlignment(int alignment)
-	{
-		m_alignment = alignment;
-        this->MarkCanvasDirty();
-	}
 
 	void Box::SetPivot(const Vector2& pivot)
 	{
@@ -253,30 +252,30 @@ namespace Viry3D
             size.y = (int) parent_rect.height;
         }
 		Vector2i local_pos;
-		if (left != NAN) {
+		if (left != DEF) {
 			local_pos.x = left;
 		}
-		if (top != NAN) {
+		if (top != DEF) {
 			local_pos.y = top;
 		}
-		if (right != NAN) {
+		if (right != DEF) {
 			local_pos.x = parent_rect.width - size.x - right;
 		}
-		if (bottom != NAN) {
+		if (bottom != DEF) {
 			local_pos.y = parent_rect.height - size.y - bottom;
 		}
-		if (left != NAN && right != NAN) {
+		if (left != DEF && right != DEF) {
 			local_pos.x = left;
 			size.x = parent_rect.width - right;
 		}
-		if (top != NAN && bottom != NAN) {
+		if (top != DEF && bottom != DEF) {
 			local_pos.y = top;
 			size.y = parent_rect.height - bottom;
 		}
-		if (centerX != NAN) {
+		if (centerX != DEF) {
 			local_pos.x = (parent_rect.width - size.x)*0.5;
 		}
-		if (centerY != NAN) {
+		if (centerY != DEF) {
 			local_pos.y = (parent_rect.height - size.y)*0.5;
 		}
 
@@ -315,6 +314,15 @@ namespace Viry3D
         }
     }
 
+	void Box::MarkCanvasDirty() const
+	{
+		CanvasRenderer* canvas = this->GetCanvas();
+		if (canvas)
+		{
+			canvas->MarkCanvasDirty();
+		}
+	}
+
     void Box::ComputeVerticesRectAndMatrix(Rect& rect, Matrix4x4& matrix)
     {
         int x = (int) m_rect.x;
@@ -328,6 +336,14 @@ namespace Viry3D
         pivot_pos.z = 0;
         matrix = Matrix4x4::Translation(pivot_pos) * Matrix4x4::Rotation(Quaternion::AngleAxis(-m_rotation, Vector3::ZR)) * Matrix4x4::Scaling(m_scale) * Matrix4x4::Translation(-pivot_pos);
     }
+
+	void Box::FillMeshes(Vector<Mesh2D>& meshes)
+	{
+		for (auto& i : m_childs)
+		{
+			i->FillMeshes(meshes);
+		}
+	}
 
     bool Box::OnTouchDownInside(const Vector2i& pos) const
     {
