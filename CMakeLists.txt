@@ -171,6 +171,8 @@ file(GLOB VIRY3D_LIB_SRCS
      ${VIRY3D_LIB_SRC_DIR}/graphics/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/io/*.h
      ${VIRY3D_LIB_SRC_DIR}/io/*.cpp
+     ${VIRY3D_LIB_SRC_DIR}/luaapi/*.h
+     ${VIRY3D_LIB_SRC_DIR}/luaapi/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/math/*.h
      ${VIRY3D_LIB_SRC_DIR}/math/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/memory/*.h
@@ -209,7 +211,7 @@ file(GLOB VIRY3D_APP_SRCS
 source_group(TREE ${VIRY3D_APP_SRC_DIR}/.. FILES ${VIRY3D_APP_SRCS})
 
 # lua
-if ( FALSE )
+if ( TRUE )
 
     file(GLOB VIRY3D_DEP_SRCS_LUA
          ${VIRY3D_LIB_SRC_DIR}/lua/lpeg/lpcap.c

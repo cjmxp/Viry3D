@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "Object.h"
 #include "container/Vector.h"
 #include "graphics/Color.h"
 #include "graphics/VertexAttribute.h"
@@ -67,7 +68,7 @@ namespace Viry3D
         };
 	};
 
-	class View
+	class View : public Object
 	{
 	public:
         typedef std::function<bool(const Vector2i& pos)> InputAction;
@@ -95,7 +96,7 @@ namespace Viry3D
 		void SetPivot(const Vector2& pivot);
 		const Vector2i& GetSize() const { return m_size; }
 		void SetSize(const Vector2i& size);
-        Vector2i GetCalculateddSize();
+        Vector2i GetCalculatedSize();
 		const Vector2i& GetOffset() const { return m_offset; }
         // offset y direction is down
 		void SetOffset(const Vector2i& offset);
