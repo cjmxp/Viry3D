@@ -116,7 +116,7 @@ namespace Viry3D
 	}
 	void Box::SetColor(const String& color)
 	{
-		m_color = String::ToColor(color);
+		m_color = Color::Parse(color);
 		this->MarkCanvasDirty();
 	}
 	void Box::SetColor(const Color& color)
@@ -334,7 +334,7 @@ namespace Viry3D
         pivot_pos.x = x + Mathf::Round(m_pivot.x * m_rect.width);
         pivot_pos.y = y - Mathf::Round(m_pivot.y * m_rect.height);
         pivot_pos.z = 0;
-        matrix = Matrix4x4::Translation(pivot_pos) * Matrix4x4::Rotation(Quaternion::AngleAxis(-m_rotation, Vector3::ZR)) * Matrix4x4::Scaling(m_scale) * Matrix4x4::Translation(-pivot_pos);
+        matrix = Matrix4x4::Translation(pivot_pos) * Matrix4x4::Rotation(Quaternion::AngleAxis(-m_rotation, Vector3(0,0,1))) * Matrix4x4::Scaling(m_scale) * Matrix4x4::Translation(-pivot_pos);
     }
 
 	void Box::FillMeshes(Vector<Mesh2D>& meshes)

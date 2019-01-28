@@ -139,15 +139,15 @@ namespace Viry3D
 		CanvasRenderer* m_canvas{ nullptr };
 		Box* m_parent{nullptr};
 		Vector<Ref<Box>> m_childs;
-		Color m_color{Color::White};
-		Vector2 m_pivot{ Vector2::ZERO};
+		Color m_color{ Color::White() };
+		Vector2 m_pivot;
         Vector2i m_size;
         Vector2i m_position;
         Vector2 m_local_scale;
         Rect m_rect;
 		float m_local_rotation{ 0.0f };
 		float m_rotation{0.0f};
-		Vector2 m_scale{ Vector2::ONE };
+		Vector2 m_scale{ Vector2::One() };
 		InputAction m_on_touch_down_inside{ nullptr };
         InputAction m_on_touch_move_inside{ nullptr };
         InputAction m_on_touch_up_inside{ nullptr };
