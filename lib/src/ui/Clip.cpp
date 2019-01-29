@@ -67,8 +67,8 @@ namespace Viry3D
 			vs[2].color = m_color;
 			vs[3].color = m_color;
 
-			vs[0].uv = Vector2(0, 0);
-			vs[0].uv = Vector2(0, 0);
+			vs[0].uv = Vector2(0.0f, 0.0f);
+			vs[1].uv = Vector2(0.0f, 0);
 
 			x_ = w_;
 			y_ = y_;
