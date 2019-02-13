@@ -36,9 +36,10 @@
 
 namespace Viry3D
 {
-	CanvasRenderer::CanvasRenderer():
+	CanvasRenderer::CanvasRenderer(FilterMode filter_mode):
 		m_canvas_dirty(true),
-        m_atlas_array_size(0)
+        m_atlas_array_size(0),
+        m_filter_mode(filter_mode)
 	{
 		this->CreateMaterial();
         this->NewAtlasTextureLayer();
@@ -52,14 +53,6 @@ namespace Viry3D
             delete m_atlas_tree[i];
         }
         m_atlas_tree.Clear();
-
-#if VR_VULKAN
-        if (m_draw_buffer)
-        {
-            m_draw_buffer->Destroy(Display::Instance()->GetDevice());
-            m_draw_buffer.reset();
-        }
-#endif
 	}
 
     void CanvasRenderer::ReleaseAtlasTreeNode(AtlasTreeNode* node)
@@ -184,6 +177,7 @@ void main()
 
         auto material = RefMake<Material>(shader);
         material->SetColor("u_color", Color(1, 1, 1, 1));
+        material->SetVector(CLIP_RECT, Vector4(0, 0, 1, 1));
 
         this->SetMaterial(material);
     }
@@ -206,7 +200,7 @@ void main()
                 ATLAS_SIZE,
                 m_atlas_array_size,
                 TextureFormat::R8G8B8A8,
-                FilterMode::Linear,
+                m_filter_mode,
                 SamplerAddressMode::ClampToEdge,
                 false,
                 true);
@@ -216,7 +210,7 @@ void main()
                 ATLAS_SIZE,
                 ATLAS_SIZE,
                 TextureFormat::R8G8B8A8,
-                FilterMode::Linear,
+                m_filter_mode,
                 SamplerAddressMode::ClampToEdge,
                 false,
                 true,
@@ -236,7 +230,7 @@ void main()
                 ATLAS_SIZE,
                 new_array_size,
                 TextureFormat::R8G8B8A8,
-                FilterMode::Linear,
+                m_filter_mode,
                 SamplerAddressMode::ClampToEdge,
                 false,
                 true);
@@ -261,39 +255,19 @@ void main()
         }
 
         AtlasTreeNode* layer = new AtlasTreeNode();
-        layer->x = 0;
-        layer->y = 0;
-        layer->w = ATLAS_SIZE;
-        layer->h = ATLAS_SIZE;
+        layer->rect.x = 0;
+        layer->rect.y = 0;
+        layer->rect.w = ATLAS_SIZE;
+        layer->rect.h = ATLAS_SIZE;
         layer->layer = m_atlas_tree.Size();
         m_atlas_tree.Add(layer);
 
-        this->GetMaterial()->SetTexture("u_texture", m_atlas);
+        const auto& materials = this->GetMaterials();
+        for (auto& i : materials)
+        {
+            i->SetTexture("u_texture", m_atlas);
+        }
     }
-
-	Ref<BufferObject> CanvasRenderer::GetVertexBuffer() const
-	{
-		Ref<BufferObject> buffer;
-
-		if (m_mesh)
-		{
-			buffer = m_mesh->GetVertexBuffer();
-		}
-
-		return buffer;
-	}
-
-	Ref<BufferObject> CanvasRenderer::GetIndexBuffer() const
-	{
-		Ref<BufferObject> buffer;
-
-		if (m_mesh)
-		{
-			buffer = m_mesh->GetIndexBuffer();
-		}
-
-		return buffer;
-	}
 
 	void CanvasRenderer::Update()
 	{
@@ -310,8 +284,8 @@ void main()
             // make camera position in left top of view rect instead center,
             // to avoid half pixel problem.
             {
-                float view_width = this->GetCamera()->GetTargetWidth() * this->GetCamera()->GetViewportRect().width;
-                float view_height = this->GetCamera()->GetTargetHeight() * this->GetCamera()->GetViewportRect().height;
+                float view_width = this->GetCamera()->GetTargetWidth() * this->GetCamera()->GetViewportRect().w;
+                float view_height = this->GetCamera()->GetTargetHeight() * this->GetCamera()->GetViewportRect().h;
 
                 float top = 0;
                 float bottom = (float) -this->GetCamera()->GetTargetHeight();
@@ -321,8 +295,6 @@ void main()
                 
                 this->GetCamera()->SetProjectionMatrixExternal(projection_matrix);
             }
-
-            this->GetCamera()->SetProjectionUniform(this->GetMaterial());
 
             this->UpdateCanvas();
 		}
@@ -380,7 +352,7 @@ void main()
         for (int i = 0; i < m_views.Size(); ++i)
         {
             m_views[i]->UpdateLayout();
-            m_views[i]->FillMeshes(m_view_meshes);
+            m_views[i]->FillMeshes(m_view_meshes, Rect(0, 0, 1, 1));
         }
 
         List<ViewMesh*> mesh_list;
@@ -431,14 +403,30 @@ void main()
             }
         }
 
+        Vector<Mesh::Submesh> submeshes;
+        Vector<Rect> clip_rects;
         Vector<Vertex> vertices;
         Vector<unsigned short> indices;
-
+        
         for (const auto& i : m_view_meshes)
         {
             if (i.vertices.Size() > 0 && i.indices.Size() > 0 && (i.texture || i.image))
             {
                 int index_offset = vertices.Size();
+
+                if (clip_rects.Size() == 0 || i.clip_rect != clip_rects[clip_rects.Size() - 1])
+                {
+                    clip_rects.Add(i.clip_rect);
+
+                    Mesh::Submesh submesh;
+                    submesh.index_first = indices.Size();
+                    submesh.index_count = i.indices.Size();
+                    submeshes.Add(submesh);
+                }
+                else
+                {
+                    submeshes[submeshes.Size() - 1].index_count += i.indices.Size();
+                }
 
                 vertices.AddRange(i.vertices);
 
@@ -449,28 +437,13 @@ void main()
             }
         }
 
-        bool draw_buffer_dirty = false;
-
-        if (!m_mesh)
-        {
-            if (indices.Size() > 0)
-            {
-                draw_buffer_dirty = true;
-            }
-        }
-        else
-        {
-            if (indices.Size() != m_mesh->GetIndexCount())
-            {
-                draw_buffer_dirty = true;
-            }
-        }
-
+        auto mesh = this->GetMesh();
         if (vertices.Size() > 0 && indices.Size() > 0)
         {
-            if (!m_mesh || vertices.Size() > m_mesh->GetVertexCount() || indices.Size() > m_mesh->GetIndexCount())
+            if (!mesh || vertices.Size() > mesh->GetVertexCount() || indices.Size() > mesh->GetIndexCount())
             {
-                m_mesh = RefMake<Mesh>(vertices, indices, Vector<Mesh::Submesh>(), true);
+                mesh = RefMake<Mesh>(vertices, indices, submeshes, true);
+                this->SetMesh(mesh);
 
 #if VR_VULKAN
                 this->MarkInstanceCmdDirty();
@@ -478,20 +451,57 @@ void main()
             }
             else
             {
-                m_mesh->Update(vertices, indices);
+                mesh->Update(vertices, indices, submeshes);
+
+                m_draw_buffer_dirty = true;
             }
         }
         else
         {
-            m_mesh.reset();
+            if (mesh)
+            {
+                mesh.reset();
+                this->SetMesh(mesh);
+
+#if VR_VULKAN
+                this->MarkInstanceCmdDirty();
+#endif
+            }
         }
 
-        if (draw_buffer_dirty)
+        // update materials
+        if (this->GetMaterials().Size() != submeshes.Size())
         {
-            m_draw_buffer_dirty = true;
+            Vector<Ref<Material>> materials(submeshes.Size());
+            for (int i = 0; i < materials.Size(); ++i)
+            {
+                materials[i] = RefMake<Material>(this->GetMaterial()->GetShader());
+                materials[i]->SetColor("u_color", Color(1, 1, 1, 1));
+                materials[i]->SetTexture("u_texture", m_atlas);
+                materials[i]->SetVector(CLIP_RECT, Vector4(clip_rects[i].x, clip_rects[i].y, clip_rects[i].w, clip_rects[i].h));
+            }
+            this->SetMaterials(materials);
+        }
+        else
+        {
+            const auto& materials = this->GetMaterials();
+            for (int i = 0; i < materials.Size(); ++i)
+            {
+                this->GetCamera()->SetProjectionUniform(materials[i]);
+                auto clip = materials[i]->GetVector(CLIP_RECT);
+                auto new_clip = Vector4(clip_rects[i].x, clip_rects[i].y, clip_rects[i].w, clip_rects[i].h);
+                if (clip == nullptr || *clip != new_clip)
+                {
+                    materials[i]->SetVector(CLIP_RECT, new_clip);
+
+#if VR_VULKAN
+                    this->MarkInstanceCmdDirty();
+#endif
+                }
+            }
         }
 
-        /*
+#if 0
         // test output atlas texture
         if (atlas_updated)
         {
@@ -508,45 +518,6 @@ void main()
                 };
                 image.EncodeToPNG(String::Format("%s/atlas%d.png", Application::Instance()->GetSavePath().CString(), i));
             }
-        }
-        //*/
-    }
-
-    void CanvasRenderer::UpdateDrawBuffer()
-    {
-#if VR_VULKAN
-        VkDrawIndexedIndirectCommand draw;
-        if (m_mesh)
-        {
-            draw.indexCount = m_mesh->GetIndexCount();
-        }
-        else
-        {
-            draw.indexCount = 0;
-        }
-        draw.instanceCount = 1;
-        draw.firstIndex = 0;
-        draw.vertexOffset = 0;
-        draw.firstInstance = 0;
-
-        if (!m_draw_buffer)
-        {
-            m_draw_buffer = Display::Instance()->CreateBuffer(&draw, sizeof(draw), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, false, VK_FORMAT_UNDEFINED);
-        }
-        else
-        {
-            Display::Instance()->UpdateBuffer(m_draw_buffer, 0, &draw, sizeof(draw));
-        }
-#elif VR_GLES
-        m_draw_buffers.Resize(1);
-        m_draw_buffers[0].first_index = 0;
-        if (m_mesh)
-        {
-            m_draw_buffers[0].index_count = m_mesh->GetIndexCount();
-        }
-        else
-        {
-            m_draw_buffers[0].index_count = 0;
         }
 #endif
     }
@@ -592,40 +563,40 @@ void main()
             AtlasTreeNode* left = new AtlasTreeNode();
             AtlasTreeNode* right = new AtlasTreeNode();
 
-            int remain_w = node->w - texture_width - PADDING_SIZE;
-            int remain_h = node->h - texture_height - PADDING_SIZE;
+            int remain_w = node->rect.w - texture_width - PADDING_SIZE;
+            int remain_h = node->rect.h - texture_height - PADDING_SIZE;
 
             if (remain_w <= remain_h)
             {
-                left->x = node->x + texture_width + PADDING_SIZE;
-                left->y = node->y;
-                left->w = remain_w;
-                left->h = texture_height;
+                left->rect.x = node->rect.x + texture_width + PADDING_SIZE;
+                left->rect.y = node->rect.y;
+                left->rect.w = remain_w;
+                left->rect.h = texture_height;
                 left->layer = node->layer;
 
-                right->x = node->x;
-                right->y = node->y + texture_height + PADDING_SIZE;
-                right->w = node->w;
-                right->h = remain_h;
+                right->rect.x = node->rect.x;
+                right->rect.y = node->rect.y + texture_height + PADDING_SIZE;
+                right->rect.w = node->rect.w;
+                right->rect.h = remain_h;
                 right->layer = node->layer;
             }
             else
             {
-                left->x = node->x;
-                left->y = node->y + texture_height + PADDING_SIZE;
-                left->w = texture_width;
-                left->h = remain_h;
+                left->rect.x = node->rect.x;
+                left->rect.y = node->rect.y + texture_height + PADDING_SIZE;
+                left->rect.w = texture_width;
+                left->rect.h = remain_h;
                 left->layer = node->layer;
 
-                right->x = node->x + texture_width + PADDING_SIZE;
-                right->y = node->y;
-                right->w = remain_w;
-                right->h = node->h;
+                right->rect.x = node->rect.x + texture_width + PADDING_SIZE;
+                right->rect.y = node->rect.y;
+                right->rect.w = remain_w;
+                right->rect.h = node->rect.h;
                 right->layer = node->layer;
             }
 
-            node->w = texture_width;
-            node->h = texture_height;
+            node->rect.w = texture_width;
+            node->rect.h = texture_height;
             node->children.Resize(2);
             node->children[0] = left;
             node->children[1] = right;
@@ -638,10 +609,10 @@ void main()
                     mesh.texture,
                     0, 0,
                     0, 0,
-                    node->w, node->h,
+                    node->rect.w, node->rect.h,
                     node->layer, 0,
-                    node->x, node->y,
-                    node->w, node->h);
+                    node->rect.x, node->rect.y,
+                    node->rect.w, node->rect.h);
 
                 m_atlas_cache.Add(mesh.texture.get(), node);
             }
@@ -651,13 +622,13 @@ void main()
                 m_atlas->UpdateTexture2DArray(
                     mesh.image->data,
                     node->layer, 0,
-                    node->x, node->y,
-                    node->w, node->h);
+                    node->rect.x, node->rect.y,
+                    node->rect.w, node->rect.h);
 #elif VR_GLES
                 m_atlas->UpdateTexture2D(
                     mesh.image->data,
-                    node->x, node->y,
-                    node->w, node->h,
+                    node->rect.x, node->rect.y,
+                    node->rect.w, node->rect.h,
                     0);
 #endif
 
@@ -668,8 +639,8 @@ void main()
         }
 
         // update uv
-        Vector2 uv_offset(node->x / (float) ATLAS_SIZE, node->y / (float) ATLAS_SIZE);
-        Vector2 uv_scale(node->w / (float) ATLAS_SIZE, node->h / (float) ATLAS_SIZE);
+        Vector2 uv_offset(node->rect.x / (float) ATLAS_SIZE, node->rect.y / (float) ATLAS_SIZE);
+        Vector2 uv_scale(node->rect.w / (float) ATLAS_SIZE, node->rect.h / (float) ATLAS_SIZE);
 
         for (int i = 0; i < mesh.vertices.Size(); ++i)
         {
@@ -683,7 +654,7 @@ void main()
     {
         if (node->children.Size() == 0)
         {
-            if (node->w - PADDING_SIZE >= w && node->h - PADDING_SIZE >= h)
+            if (node->rect.w - PADDING_SIZE >= w && node->rect.h - PADDING_SIZE >= h)
             {
                 return node;
             }
@@ -709,8 +680,8 @@ void main()
     void CanvasRenderer::HandleTouchEvent()
     {
         if (this->GetCamera()->HasRenderTarget() ||
-            this->GetCamera()->GetViewportRect().width < 1.0f ||
-            this->GetCamera()->GetViewportRect().height < 1.0f)
+            this->GetCamera()->GetViewportRect().w < 1.0f ||
+            this->GetCamera()->GetViewportRect().h < 1.0f)
         {
             return;
         }
@@ -742,16 +713,23 @@ void main()
         lines[2] = Vector3(y3 - y2, x2 - x3, x3 * y2 - x2 * y3);
         lines[3] = Vector3(y0 - y3, x3 - x0, x0 * y3 - x3 * y0);
 
+        bool all_positive = true;
+        bool all_negative = true;
+
         for (int i = 0; i < 4; ++i)
         {
             float sign = lines[i].x * pos.x + lines[i].y * pos.y + lines[i].z;
             if (sign >= 0)
             {
-                return false;
+                all_negative = false;
+            }
+            if (sign <= 0)
+            {
+                all_positive = false;
             }
         }
 
-        return true;
+        return all_positive || all_negative;
     }
 
     void CanvasRenderer::HitViews(const Touch& t)
