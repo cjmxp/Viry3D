@@ -17,35 +17,31 @@
 
 #pragma once
 
-#include "LuaNode.h"
-#include "graphics/Camera.h"
-#include "ui/CanvasRenderer.h"
+#include "LuaAPI.h"
+#include "Application.h"
 
 namespace Viry3D
 {
-    class LuaCamera
+    class LuaApplication
     {
     public:
         static void Set(lua_State* L)
         {
-            LuaAPI::SetMetaTable(L, LuaClassType::Camera, Index, nullptr, nullptr);
-
-            GetMethods().Add("AddRenderer", AddRenderer);
+            LuaAPI::SetFunction(L, "Application", "GetDataPath", GetDataPath);
+            LuaAPI::SetFunction(L, "Application", "GetSavePath", GetSavePath);
         }
 
     private:
-        IMPL_INDEX_EXTENDS_FUNC(Node);
-        IMPL_GET_METHODS_FUNC();
-
-        static int AddRenderer(lua_State* L)
+        static int GetDataPath(lua_State* L)
         {
-            Camera* p1 = LuaAPI::GetRawPtr<Camera>(L, 1);
-            LuaClassPtr* p2 = (LuaClassPtr*) lua_touserdata(L, 2);
+            lua_pushstring(L, Application::Instance()->GetDataPath().CString());
+            return 1;
+        }
 
-            Ref<Renderer>* renderer = (Ref<Renderer>*) p2->ptr;
-            p1->AddRenderer(*renderer);
-
-            return 0;
+        static int GetSavePath(lua_State* L)
+        {
+            lua_pushstring(L, Application::Instance()->GetSavePath().CString());
+            return 1;
         }
     };
 }

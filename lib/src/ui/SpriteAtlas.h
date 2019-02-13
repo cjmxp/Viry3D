@@ -17,35 +17,33 @@
 
 #pragma once
 
-#include "LuaNode.h"
-#include "graphics/Camera.h"
-#include "ui/CanvasRenderer.h"
+#include "Object.h"
+#include "math/Recti.h"
+#include "math/Vector4.h"
+#include "container/Map.h"
 
 namespace Viry3D
 {
-    class LuaCamera
+    class Texture;
+
+    class SpriteAtlas : public Object
     {
     public:
-        static void Set(lua_State* L)
+        struct Sprite
         {
-            LuaAPI::SetMetaTable(L, LuaClassType::Camera, Index, nullptr, nullptr);
+            String name;
+            Recti rect;
+            Vector4 border;
+        };
 
-            GetMethods().Add("AddRenderer", AddRenderer);
-        }
+        static Ref<SpriteAtlas> LoadFromFile(const String& file);
+        SpriteAtlas();
+        virtual ~SpriteAtlas();
+        const Ref<Texture>& GetTexture() const { return m_texture; }
+        const Sprite& GetSprite(const String& name) const { return m_sprites[name]; }
 
     private:
-        IMPL_INDEX_EXTENDS_FUNC(Node);
-        IMPL_GET_METHODS_FUNC();
-
-        static int AddRenderer(lua_State* L)
-        {
-            Camera* p1 = LuaAPI::GetRawPtr<Camera>(L, 1);
-            LuaClassPtr* p2 = (LuaClassPtr*) lua_touserdata(L, 2);
-
-            Ref<Renderer>* renderer = (Ref<Renderer>*) p2->ptr;
-            p1->AddRenderer(*renderer);
-
-            return 0;
-        }
+        Ref<Texture> m_texture;
+        Map<String, Sprite> m_sprites;
     };
 }

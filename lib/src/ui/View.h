@@ -25,6 +25,7 @@
 #include "math/Vector2i.h"
 #include "math/Quaternion.h"
 #include "math/Rect.h"
+#include "math/Recti.h"
 #include "math/Matrix4x4.h"
 #include <functional>
 
@@ -45,6 +46,7 @@ namespace Viry3D
         Ref<Image> image;
         View* view = nullptr;
         bool base_view = false;
+        Rect clip_rect = Rect(0, 0, 1, 1);
 
         bool HasTextureOrImage() const
         {
@@ -104,10 +106,12 @@ namespace Viry3D
         void SetLocalRotation(const Quaternion& rotation);
         const Vector2& GetLocalScale() const { return m_local_scale; }
         void SetLocalScale(const Vector2& scale);
-        const Rect& GetRect() const { return m_rect; }
-        const Quaternion& GetRotation() const { return m_rotation; }
-        const Vector2& GetScale() const { return m_scale; }
-        void FillMeshes(Vector<ViewMesh>& mesh);
+        const Recti& GetRect() const { return m_rect; }
+        const Matrix4x4& GetVertexMatrix() { return m_vertex_matrix; }
+        bool IsClipRect() const { return m_clip_rect; }
+        void EnableClipRect(bool enable);
+        Rect GetClipRect() const;
+        void FillMeshes(Vector<ViewMesh>& mesh, const Rect& clip_rect);
         void SetOnTouchDownInside(InputAction func) { m_on_touch_down_inside = func; }
         void SetOnTouchMoveInside(InputAction func) { m_on_touch_move_inside = func; }
         void SetOnTouchUpInside(InputAction func) { m_on_touch_up_inside = func; }
@@ -121,8 +125,8 @@ namespace Viry3D
 
     protected:
         void MarkCanvasDirty() const;
-        virtual void FillSelfMeshes(Vector<ViewMesh>& meshes);
-        void ComputeVerticesRectAndMatrix(Rect& rect, Matrix4x4& matrix);
+        virtual void FillSelfMeshes(Vector<ViewMesh>& meshes, const Rect& clip_rect);
+        void ComputeVerticesMatrix();
 
 	private:
 		CanvasRenderer* m_canvas;
@@ -135,9 +139,9 @@ namespace Viry3D
         Vector2i m_offset;
         Quaternion m_local_rotation;
         Vector2 m_local_scale;
-        Rect m_rect;
-        Quaternion m_rotation;
-        Vector2 m_scale;
+        bool m_clip_rect;
+        Recti m_rect;
+        Matrix4x4 m_vertex_matrix;
         InputAction m_on_touch_down_inside;
         InputAction m_on_touch_move_inside;
         InputAction m_on_touch_up_inside;

@@ -17,33 +17,46 @@
 
 #pragma once
 
-#include "LuaNode.h"
-#include "graphics/Camera.h"
-#include "ui/CanvasRenderer.h"
+#include "LuaView.h"
+#include "ui/Sprite.h"
 
 namespace Viry3D
 {
-    class LuaCamera
+    class LuaSprite
     {
     public:
+        IMPL_INDEX_EXTENDS_FUNC(View);
+
         static void Set(lua_State* L)
         {
-            LuaAPI::SetMetaTable(L, LuaClassType::Camera, Index, nullptr, nullptr);
+            LuaAPI::SetMetaTable(L, LuaClassType::Sprite, Index, New, GC);
 
-            GetMethods().Add("AddRenderer", AddRenderer);
+            GetMethods().Add("GetTexture", GetTexture);
+            GetMethods().Add("SetTexture", SetTexture);
         }
 
     private:
-        IMPL_INDEX_EXTENDS_FUNC(Node);
+        IMPL_NEW_FUNC(Sprite);
+        IMPL_GC_FUNC(Sprite);
         IMPL_GET_METHODS_FUNC();
-
-        static int AddRenderer(lua_State* L)
+        
+        static int GetTexture(lua_State* L)
         {
-            Camera* p1 = LuaAPI::GetRawPtr<Camera>(L, 1);
+            Sprite* p1 = LuaAPI::GetRawPtr<Sprite>(L, 1);
+
+            Ref<Texture>* ptr = new Ref<Texture>(p1->GetTexture());
+            LuaAPI::PushPtr(L, { ptr, LuaClassType::Texture, LuaPtrType::Shared });
+
+            return 1;
+        }
+
+        static int SetTexture(lua_State* L)
+        {
+            Sprite* p1 = LuaAPI::GetRawPtr<Sprite>(L, 1);
             LuaClassPtr* p2 = (LuaClassPtr*) lua_touserdata(L, 2);
 
-            Ref<Renderer>* renderer = (Ref<Renderer>*) p2->ptr;
-            p1->AddRenderer(*renderer);
+            Ref<Texture>* texture = (Ref<Texture>*) p2->ptr;
+            p1->SetTexture(*texture);
 
             return 0;
         }

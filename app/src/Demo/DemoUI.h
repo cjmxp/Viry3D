@@ -21,6 +21,7 @@
 #include "Debug.h"
 #include "ui/Sprite.h"
 #include "ui/Button.h"
+#include "ui/SpriteAtlas.h"
 
 namespace Viry3D
 {
@@ -29,8 +30,12 @@ namespace Viry3D
     public:
         void InitCanvas()
         {
-            auto canvas = RefMake<CanvasRenderer>();
+            auto canvas = RefMake<CanvasRenderer>(FilterMode::Nearest);
             m_ui_camera->AddRenderer(canvas);
+
+            auto group = RefMake<View>();
+            group->SetSize(Vector2i(VIEW_SIZE_FILL_PARENT, VIEW_SIZE_FILL_PARENT));
+            canvas->AddView(group);
 
             String text = UR"(¹ú·ç¡¤ÎÀ·ç¡¤ä¿°Â
 Õ°±Ëä¿°Â£¬ÂÌÖñâ¢â¢¡£ÓÐ·Ë¾ý×Ó£¬ÈçÇÐÈç´è£¬Èç×ÁÈçÄ¥¡£
@@ -44,12 +49,13 @@ Vulkan is a new generation graphics and compute API that provides high-efficienc
 cross-platform access to modern GPUs used in a wide variety of devices from PCs
 and consoles to mobile phones and embedded platforms. )";
             auto label = RefMake<Label>();
-            canvas->AddView(label);
+            group->AddSubview(label);
 
             label->SetAlignment(ViewAlignment::Left | ViewAlignment::Top);
             label->SetPivot(Vector2(0, 0));
-            label->SetSize(Vector2i(100, 30));
+            label->SetSize(Vector2i(400, 400));
             label->SetOffset(Vector2i(40, 100));
+            label->EnableClipRect(true);
             label->SetFont(Font::GetFont(FontType::PingFangSC));
             label->SetFontSize(26);
             label->SetTextAlignment(ViewAlignment::Left | ViewAlignment::Top);
@@ -69,9 +75,12 @@ and consoles to mobile phones and embedded platforms. )";
             for (int i = 0; i < 6; ++i)
             {
                 auto button = RefMake<Button>();
-                button->SetSize(Vector2i(165, 68));
+                button->SetSize(Vector2i(195, 195));
                 button->SetOffset(Vector2i(-500 + i * 200, 100));
-                button->SetTexture(texture);
+                button->SetTexture(texture,
+                    Recti(0, 0, texture->GetWidth(), texture->GetHeight()),
+                    Vector4(82, 33, 82, 33));
+                button->SetSpriteType(SpriteType::Sliced);
                 button->SetColor(colors[i]);
                 button->GetLabel()->SetText("button");
                 if (i == 5)
@@ -86,8 +95,22 @@ and consoles to mobile phones and embedded platforms. )";
                     Log("click button: %d", i);
                 });
 
-                canvas->AddView(button);
+                group->AddSubview(button);
             }
+
+            auto atlas = SpriteAtlas::LoadFromFile(Application::Instance()->GetDataPath() + "/res/SunnyLand/tileset-sliced.json");
+
+            auto sprite = RefMake<Sprite>();
+            sprite->SetSize(Vector2i(200, 200));
+            sprite->SetOffset(Vector2i(0, 0));
+            sprite->SetAtlas(atlas);
+            sprite->SetSpriteName("tileset-sliced_0");
+            sprite->SetSpriteType(SpriteType::Filled);
+            sprite->SetFillMethod(SpriteFillMethod::Vertical);
+            sprite->SetFillOrigin((int) SpriteOriginVertical::Bottom);
+            sprite->SetFillAmount(0.75f);
+
+            group->AddSubview(sprite);
         }
 
         virtual void Init()
