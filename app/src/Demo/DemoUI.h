@@ -22,12 +22,16 @@
 #include "ui/Sprite.h"
 #include "ui/Button.h"
 #include "ui/SpriteAtlas.h"
+#include "ui/InputField.h"
 
 namespace Viry3D
 {
     class DemoUI : public DemoMesh
     {
     public:
+        Sprite* m_sprite = nullptr;
+        float m_sprite_fill = 0;
+
         void InitCanvas()
         {
             auto canvas = RefMake<CanvasRenderer>(FilterMode::Nearest);
@@ -101,16 +105,25 @@ and consoles to mobile phones and embedded platforms. )";
             auto atlas = SpriteAtlas::LoadFromFile(Application::Instance()->GetDataPath() + "/res/SunnyLand/tileset-sliced.json");
 
             auto sprite = RefMake<Sprite>();
-            sprite->SetSize(Vector2i(200, 200));
+            sprite->SetSize(Vector2i(256, 256));
             sprite->SetOffset(Vector2i(0, 0));
             sprite->SetAtlas(atlas);
             sprite->SetSpriteName("tileset-sliced_0");
             sprite->SetSpriteType(SpriteType::Filled);
-            sprite->SetFillMethod(SpriteFillMethod::Vertical);
-            sprite->SetFillOrigin((int) SpriteOriginVertical::Bottom);
-            sprite->SetFillAmount(0.75f);
+            sprite->SetFillMethod(SpriteFillMethod::Radial360);
+            sprite->SetFillOrigin((int) SpriteOrigin360::Right);
+            sprite->SetFillClockWise(false);
+            sprite->SetFillAmount(m_sprite_fill);
 
             group->AddSubview(sprite);
+
+            m_sprite = sprite.get();
+
+            auto input = RefMake<InputField>();
+            input->SetSize(Vector2i(500, 80));
+            input->SetOffset(Vector2i(0, 270));
+
+            group->AddSubview(input);
         }
 
         virtual void Init()
@@ -128,6 +141,13 @@ and consoles to mobile phones and embedded platforms. )";
         virtual void Update()
         {
             DemoMesh::Update();
+
+            m_sprite_fill += 0.01f;
+            if (m_sprite_fill > 1.0f)
+            {
+                m_sprite_fill = 0;
+            }
+            m_sprite->SetFillAmount(m_sprite_fill);
         }
     };
 }

@@ -47,7 +47,7 @@
 #include "ui/ScrollView.h"
 
 // TODO:
-// - Tiled/Filled Sprite
+// - text input
 // - Canvas Editor
 // - 2D Game Demo
 // - PBR optimize

@@ -17,27 +17,23 @@
 
 #pragma once
 
-#include "Renderer.h"
+#include "Sprite.h"
 
 namespace Viry3D
 {
-    class Mesh;
+    class Label;
 
-    class MeshRenderer : public Renderer
+    class InputField : public Sprite
     {
     public:
-        MeshRenderer();
-        virtual ~MeshRenderer();
-        virtual Ref<BufferObject> GetVertexBuffer() const;
-        virtual Ref<BufferObject> GetIndexBuffer() const;
-        virtual IndexType GetIndexType() const;
-        const Ref<Mesh>& GetMesh() const { return m_mesh; }
-        void SetMesh(const Ref<Mesh>& mesh);
-
-    protected:
-        virtual void UpdateDrawBuffer();
+        InputField();
+        virtual ~InputField();
+        const Ref<Label>& GetLabel() const { return m_label; }
 
     private:
-        Ref<Mesh> m_mesh;
+        Ref<Label> m_label;
+        bool m_touch_down;
+        bool m_focused;
+        bool m_multi_line;
     };
 }

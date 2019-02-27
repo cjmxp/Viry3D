@@ -29,7 +29,6 @@ namespace Viry3D
     {
         Simple,
         Sliced,
-        Tiled,
         Filled,
     };
 
@@ -97,6 +96,15 @@ namespace Viry3D
 
     protected:
         virtual void FillSelfMeshes(Vector<ViewMesh>& meshes, const Rect& clip_rect);
+
+    private:
+        void FillSelfMeshSimple(Vector<ViewMesh>& meshes, const Rect& clip_rect);
+        void FillSelfMeshSliced(Vector<ViewMesh>& meshes, const Rect& clip_rect);
+        void FillSelfMeshFilledHorizontal(Vector<ViewMesh>& meshes, const Rect& clip_rect, const Rect& rect, const Matrix4x4& vertex_matrix);
+        void FillSelfMeshFilledVertical(Vector<ViewMesh>& meshes, const Rect& clip_rect, const Rect& rect, const Matrix4x4& vertex_matrix);
+        void FillSelfMeshFilledRadial90(Vector<ViewMesh>& meshes, const Rect& clip_rect, const Rect& rect, const Matrix4x4& vertex_matrix);
+        void FillSelfMeshFilledRadial180(Vector<ViewMesh>& meshes, const Rect& clip_rect, const Rect& rect, const Matrix4x4& vertex_matrix);
+        void FillSelfMeshFilledRadial360(Vector<ViewMesh>& meshes, const Rect& clip_rect, const Rect& rect, const Matrix4x4& vertex_matrix);
 
     private:
         Ref<Texture> m_texture;
