@@ -132,7 +132,7 @@ namespace Viry3D
         return sp;
     }
 
-    SphericalPolynomial CubeMapToSphericalPolynomialTools::ConvertCubeMapToSphericalPolynomial(int size, TextureFormat format, const Vector<ByteBuffer>& faces, bool gamma_space)
+    SphericalPolynomial CubeMapToSphericalPolynomialTools::ConvertCubeMapToSphericalPolynomial(int size, ImageFormat format, const Vector<ByteBuffer>& faces, bool gamma_space)
     {
         SphericalHarmonics sh;
         float total_solid_angle = 0.f;
@@ -184,7 +184,7 @@ namespace Viry3D
                     float g = 0;
                     float b = 0;
 
-                    if (format == TextureFormat::R8G8B8A8)
+                    if (format == ImageFormat::R8G8B8A8)
                     {
                         int stride = 4;
                         r = face[(y * size * stride) + (x * stride) + 0];

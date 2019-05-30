@@ -17,107 +17,100 @@
 
 #pragma once
 
-#include "Display.h"
-#include "RenderState.h"
-#include "string/String.h"
+#include "Object.h"
+#include "container/Vector.h"
 #include "container/List.h"
 #include "container/Map.h"
+#include "private/backend/DriverApi.h"
 
 namespace Viry3D
 {
-#if VR_VULKAN
-    struct Pipeline
-    {
-        VkPipeline pipeline;
-        bool instancing;
-    };
-#endif
-
-    class Shader
+    class Shader : public Object
     {
     public:
-		static Ref<Shader> Find(const String& name);
-		static void AddCache(const String& name, const Ref<Shader>& shader);
-        static void RemoveCache(const String& name);
-		static void Done();
-        Shader(
-            const String& vs_predefine,
-            const Vector<String>& vs_includes,
-            const String& vs_source,
-            const String& fs_predefine,
-            const Vector<String>& fs_includes,
-            const String& fs_source,
-            const RenderState& render_state);
-        Shader(const String& cs_source);
-        ~Shader();
-        const RenderState& GetRenderState() const { return m_render_state; }
-        bool IsComputeShader() const { return m_compute_shader; }
-#if VR_VULKAN
-        static void OnRenderPassDestroy(VkRenderPass render_pass);
-        VkPipeline GetPipeline(VkRenderPass render_pass, bool color_attachment, bool depth_attachment, int extra_color_attachment_count, int sample_count, bool instancing, int instance_stride);
-        VkPipeline GetComputePipeline();
-        void CreateDescriptorSets(Vector<VkDescriptorSet>& descriptor_sets, Vector<UniformSet>& uniform_sets);
-        VkPipelineLayout GetPipelineLayout() const { return m_pipeline_layout; }
-#elif VR_GLES
-        bool Use() const;
-        void EnableVertexAttribs() const;
-        void DisableVertexAttribs() const;
-        void SetUniform1f(const String& name, float value) const;
-        void SetUniform4f(const String& name, int count, const float* value) const;
-        void SetUniform1i(const String& name, int value) const;
-        void SetUniformMatrix(const String& name, int count, const float* value) const;
-        void ApplyRenderState();
-#endif
+		enum class BindingPoint
+		{
+			PerView = 0,
+			PerRenderer = 1,
+			PerRendererBones = 2,
+			Lights = 3,
+			PostProcess = 4,
+			PerMaterialInstance = 5,
+			Count = 6,
+		};
 
-    private:
-#if VR_GLES
-        struct Attribute
-        {
-            String name;
-            GLenum type;
-            int size;
-            int loc;
-            int vector_size;
-        };
+		enum class AttributeLocation
+		{
+			Vertex = 0,
+			Color = 1,
+			UV = 2,
+			UV2 = 3,
+			Normal = 4,
+			Tangent = 5,
+			BoneWeights = 6,
+			BoneIndices = 7,
 
-        struct Uniform
-        {
-            String name;
-            GLenum type;
-            int size;
-            int loc;
-        };
+			Count = filament::backend::MAX_VERTEX_ATTRIBUTE_COUNT
+		};
 
-        void CreateProgram(
-            const String& vs_predefine,
-            const Vector<String>& vs_includes,
-            const String& vs_source,
-            const String& fs_predefine,
-            const Vector<String>& fs_includes,
-            const String& fs_source);
-#endif
+		enum class Queue
+		{
+			Background = 1000,
+			Geometry = 2000,
+			AlphaTest = 2450,
+			Transparent = 3000,
+			Overlay = 4000,
+		};
 
-    private:
-        static List<Shader*> m_shaders;
-		static Map<String, Ref<Shader>> m_shader_cache;
-#if VR_VULKAN
-        VkShaderModule m_cs_module;
-        VkShaderModule m_vs_module;
-        VkShaderModule m_fs_module;
-        VkPipelineCache m_pipeline_cache;
-        Vector<VkDescriptorSetLayout> m_descriptor_layouts;
-        VkPipelineLayout m_pipeline_layout;
-        VkDescriptorPool m_descriptor_pool;
-        Map<VkRenderPass, Vector<Pipeline>> m_pipelines;
-        VkPipeline m_compute_pipeline;
-        Vector<VertexAttribute> m_attributes;
-        Vector<UniformSet> m_uniform_sets;
-#elif VR_GLES
-        GLuint m_program;
-        Vector<Attribute> m_attributes;
-        Vector<Uniform> m_uniforms;
-#endif
-        RenderState m_render_state;
-        bool m_compute_shader;
+		struct Member
+		{
+			String name;
+			int offset;
+			int size;
+		};
+
+		struct Uniform
+		{
+			String name;
+			int binding;
+			Vector<Member> members;
+			int size;
+		};
+
+		struct Sampler
+		{
+			String name;
+			int binding;
+		};
+
+		struct Pass
+		{
+			String vs;
+			String fs;
+			int queue = (int) Queue::Geometry;
+			Vector<Uniform> uniforms;
+			Vector<Sampler> samplers;
+			filament::backend::PipelineState pipeline;
+		};
+
+        static void Init();
+        static void Done();
+		static Ref<Shader> Find(const String& name, const Vector<String>& keywords = Vector<String>());
+
+        Shader(const String& name);
+        virtual ~Shader();
+		int GetPassCount() const { return m_passes.Size(); }
+		const Pass& GetPass(int index) const { return m_passes[index]; }
+        int GetQueue() const { return m_queue; }
+
+	private:
+		void Load(const String& src, const List<String>& keywords);
+		void Compile();
+
+	private:
+		static Map<String, Ref<Shader>> m_shaders;
+		List<String> m_keywords;
+		Vector<Pass> m_passes;
+		int m_queue;
     };
 }

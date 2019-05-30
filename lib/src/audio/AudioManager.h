@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "Node.h"
+#include "string/String.h"
 
 namespace Viry3D
 {

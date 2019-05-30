@@ -18,26 +18,22 @@
 #pragma once
 
 #include "Renderer.h"
+#include "Mesh.h"
 
 namespace Viry3D
 {
     class Mesh;
-
+    
     class MeshRenderer : public Renderer
     {
     public:
         MeshRenderer();
         virtual ~MeshRenderer();
-        virtual Ref<BufferObject> GetVertexBuffer() const;
-        virtual Ref<BufferObject> GetIndexBuffer() const;
-        virtual IndexType GetIndexType() const;
         const Ref<Mesh>& GetMesh() const { return m_mesh; }
-        void SetMesh(const Ref<Mesh>& mesh);
-
-    protected:
-        virtual void UpdateDrawBuffer();
-
-    private:
+		virtual void SetMesh(const Ref<Mesh>& mesh);
+        virtual Vector<filament::backend::RenderPrimitiveHandle> GetPrimitives();
+        
+	private:
         Ref<Mesh> m_mesh;
     };
 }

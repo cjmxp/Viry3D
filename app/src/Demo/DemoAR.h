@@ -28,9 +28,9 @@ namespace Viry3D
     {
     public:
         ARScene* m_scene = nullptr;
-        Camera* m_clear_camera = nullptr;
-        Camera* m_bg_camera = nullptr;
-        Camera* m_scene_camera = nullptr;
+        Ref<Camera> m_clear_camera;
+        Ref<Camera> m_bg_camera;
+        Ref<Camera> m_scene_camera;
         Ref<Material> m_bg_material;
         Rect m_viewport;
         Ref<MeshRenderer> m_sphere;
@@ -56,19 +56,19 @@ namespace Viry3D
             if (m_scene_camera)
             {
                 Display::Instance()->DestroyCamera(m_scene_camera);
-                m_scene_camera = nullptr;
+                m_scene_camera.reset();
             }
             
             if (m_bg_camera)
             {
                 Display::Instance()->DestroyCamera(m_bg_camera);
-                m_bg_camera = nullptr;
+                m_bg_camera.reset();
             }
             
             if (m_clear_camera)
             {
                 Display::Instance()->DestroyCamera(m_clear_camera);
-                m_clear_camera = nullptr;
+                m_clear_camera.reset();
             }
             
             delete m_scene;
@@ -428,9 +428,9 @@ void main()
                     h = texture_h *  w / Display::Instance()->GetWidth();
                     
                     m_viewport.x = 0;
-                    m_viewport.width = 1.0f;
+                    m_viewport.w = 1.0f;
                     m_viewport.y = (Display::Instance()->GetHeight() - h) / 2 / (float) Display::Instance()->GetHeight();
-                    m_viewport.height = h / (float) Display::Instance()->GetHeight();
+                    m_viewport.h = h / (float) Display::Instance()->GetHeight();
                 }
                 else
                 {
@@ -438,9 +438,9 @@ void main()
                     w = texture_w *  h / Display::Instance()->GetHeight();
                     
                     m_viewport.x = (Display::Instance()->GetWidth() - w) / 2 / (float) Display::Instance()->GetWidth();
-                    m_viewport.width = w / (float) Display::Instance()->GetWidth();
+                    m_viewport.w = w / (float) Display::Instance()->GetWidth();
                     m_viewport.y = 0;
-                    m_viewport.height = 1.0f;
+                    m_viewport.h = 1.0f;
                 }
 
                 m_bg_camera->SetViewportRect(m_viewport);

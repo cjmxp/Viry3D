@@ -17,215 +17,64 @@
 
 #pragma once
 
-#include "Application.h"
 #include "graphics/Display.h"
-#include "graphics/Camera.h"
-#include "ui/ImGuiRenderer.h"
-#include "imgui/imgui.h"
-#include "SceneWindow.h"
+#include "math/Rect.h"
+#include "container/Vector.h"
+#include "container/Map.h"
+#include "string/String.h"
+#include "memory/ByteBuffer.h"
 
 namespace Viry3D
 {
+    class Object;
+    class Node;
+    class Camera;
+    class ImGuiRenderer;
+    class Texture;
+    class View;
+
     class CanvasEditor
     {
     public:
-        Camera* m_ui_camera = nullptr;
+        void Init();
+        void Done();
+        void Update();
+
+        void InitUI();
+        void OnGUI();
+        void ShowMainMenuBar();
+        bool BeginMainWindow(const char* name, float x, float y, float w, float h, bool resize = true);
+        void EndMainWindow();
+        void ShowSceneWindow();
+        void ShowPropertyWindow();
+        void ShowViewWindow();
+        void ShowConsoleWindow();
+
+        Ref<Camera> CreateCamera();
+        void DestroyCamera(const Ref<Camera>& camera);
+        const Vector<Ref<Camera>>& GetCameras() const { return m_cameras; }
+        Vector<uint32_t>& GetSelections() { return m_selections; }
+        ByteBuffer& GetTextBuffer(const String& name);
+        Ref<Object> GetSelectionObject(uint32_t id);
+		String OpenFilePanel(const String& initial_path, const char* filter);
+
+    private:
+        Ref<Object> FindView(const Ref<View>& view, uint32_t id);
+        Ref<Object> FindNode(const Ref<Node>& node, uint32_t id);
+
+    private:
+        Ref<Camera> m_imgui_camera;
+        Ref<ImGuiRenderer> m_imgui;
         bool m_show_demo_window = false;
         Rect m_menu_rect;
         Rect m_scene_window_rect = Rect(0, 0, (float) (Display::Instance()->GetWidth() * 200 / 1280), (float) (Display::Instance()->GetHeight() * 450 / 720));
         Rect m_property_window_rect = Rect(0, 0, (float) (Display::Instance()->GetWidth() * 200 / 1280), 0);
         Rect m_view_window_rect = Rect(0, 0, 0, 0);
-        Rect m_assets_window_rect = Rect(0, 0, (float) (Display::Instance()->GetWidth() * 640 / 1280), 0);
         Rect m_console_window_rect = Rect(0, 0, 0, 0);
-
-        void InitUI()
-        {
-            m_ui_camera = Display::Instance()->CreateCamera();
-
-            auto imgui = RefMake<ImGuiRenderer>();
-            imgui->SetDrawAction([this]() {
-                this->OnGUI();
-            });
-            m_ui_camera->AddRenderer(imgui);
-        }
-
-        void Init()
-        {
-            this->InitUI();
-        }
-
-        void Done()
-        {
-            if (m_ui_camera)
-            {
-                Display::Instance()->DestroyCamera(m_ui_camera);
-                m_ui_camera = nullptr;
-            }
-        }
-
-        void Update()
-        {
-
-        }
-
-        void OnGUI()
-        {
-            this->ShowMainMenuBar();
-            this->ShowSceneWindow();
-            this->ShowPropertyWindow();
-            this->ShowViewWindow();
-            this->ShowAssetsWindow();
-            this->ShowConsoleWindow();
-
-            if (m_show_demo_window)
-            {
-                ImGui::ShowDemoWindow();
-            }
-        }
-
-        void ShowMainMenuBar()
-        {
-            if (ImGui::BeginMainMenuBar())
-            {
-                auto pos = ImGui::GetWindowPos();
-                auto size = ImGui::GetWindowSize();
-                m_menu_rect = Rect(pos.x, pos.y, size.x, size.y);
-
-                if (ImGui::BeginMenu("File"))
-                {
-                    if (ImGui::MenuItem("New")) { }
-
-                    if (ImGui::MenuItem("Open", "Ctrl+O")) { }
-
-                    if (ImGui::MenuItem("Save", "Ctrl+S")) { }
-
-                    if (ImGui::MenuItem("Save As..")) { }
-
-                    ImGui::EndMenu();
-                }
-
-                if (ImGui::BeginMenu("Help"))
-                {
-                    ImGui::MenuItem("Demo Window", nullptr, &m_show_demo_window);
-                    
-                    ImGui::EndMenu();
-                }
-
-                ImGui::EndMainMenuBar();
-            }
-        }
-
-        bool BeginMainWindow(const char* name, float x, float y, float w, float h, bool resize = true)
-        {
-            ImGui::SetNextWindowPos(ImVec2(x, y));
-            ImGui::SetNextWindowSize(ImVec2(w, h));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-            ImGui::PushStyleColor(ImGuiCol_TitleBg, (ImVec4) ImColor(20, 20, 20));
-            ImGui::PushStyleColor(ImGuiCol_TitleBgActive, (ImVec4) ImColor(20, 20, 20));
-            ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove;
-            if (!resize)
-            {
-                window_flags |= ImGuiWindowFlags_NoResize;
-            }
-            bool is_open = ImGui::Begin(name, nullptr, window_flags);
-            ImGui::PopStyleColor(2);
-            ImGui::PopStyleVar(1);
-            return is_open;
-        }
-
-        void EndMainWindow()
-        {
-            ImGui::End();
-        }
-
-        void ShowSceneWindow()
-        {
-            if (this->BeginMainWindow("Scene",
-                m_menu_rect.x,
-                m_menu_rect.h,
-                m_scene_window_rect.w,
-                m_scene_window_rect.h))
-            {
-                SceneWindow::OnGUI();
-                
-                auto pos = ImGui::GetWindowPos();
-                auto size = ImGui::GetWindowSize();
-                m_scene_window_rect = Rect(pos.x, pos.y, size.x, size.y);
-                m_property_window_rect.h = m_scene_window_rect.h;
-            }
-            this->EndMainWindow();
-        }
-
-        void ShowPropertyWindow()
-        {
-            if (this->BeginMainWindow("Property",
-                m_scene_window_rect.x + m_scene_window_rect.w,
-                m_scene_window_rect.y,
-                m_property_window_rect.w,
-                m_property_window_rect.h))
-            {
-                auto pos = ImGui::GetWindowPos();
-                auto size = ImGui::GetWindowSize();
-                m_property_window_rect = Rect(pos.x, pos.y, size.x, size.y);
-                m_view_window_rect.h = m_property_window_rect.h;
-                m_view_window_rect.w = Display::Instance()->GetWidth() - m_scene_window_rect.w - m_property_window_rect.w;
-            }
-            this->EndMainWindow();
-        }
-
-        void ShowViewWindow()
-        {
-            if (this->BeginMainWindow("View",
-                m_property_window_rect.x + m_property_window_rect.w,
-                m_property_window_rect.y,
-                m_view_window_rect.w,
-                m_view_window_rect.h,
-                false))
-            {
-                auto pos = ImGui::GetWindowPos();
-                auto size = ImGui::GetWindowSize();
-                m_view_window_rect = Rect(pos.x, pos.y, size.x, size.y);
-                m_scene_window_rect.h = m_view_window_rect.h;
-                m_assets_window_rect.y = m_view_window_rect.y + m_view_window_rect.h;
-                m_assets_window_rect.h = Display::Instance()->GetHeight() - m_view_window_rect.y - m_view_window_rect.h;
-            }
-            this->EndMainWindow();
-        }
-
-        void ShowAssetsWindow()
-        {
-            ImGui::SetNextWindowSizeConstraints(ImVec2(0, -1), ImVec2(FLT_MAX, -1));
-            if (this->BeginMainWindow("Assets",
-                m_assets_window_rect.x,
-                m_assets_window_rect.y,
-                m_assets_window_rect.w,
-                m_assets_window_rect.h))
-            {
-                auto pos = ImGui::GetWindowPos();
-                auto size = ImGui::GetWindowSize();
-                m_assets_window_rect = Rect(pos.x, pos.y, size.x, size.y);
-                m_console_window_rect.x = m_assets_window_rect.w;
-                m_console_window_rect.y = m_assets_window_rect.y;
-                m_console_window_rect.w = Display::Instance()->GetWidth() - m_assets_window_rect.w;
-                m_console_window_rect.h = m_assets_window_rect.h;
-            }
-            this->EndMainWindow();
-        }
-
-        void ShowConsoleWindow()
-        {
-            if (this->BeginMainWindow("Console",
-                m_console_window_rect.x,
-                m_console_window_rect.y,
-                m_console_window_rect.w,
-                m_console_window_rect.h,
-                false))
-            {
-                auto pos = ImGui::GetWindowPos();
-                auto size = ImGui::GetWindowSize();
-                m_console_window_rect = Rect(pos.x, pos.y, size.x, size.y);
-            }
-            this->EndMainWindow();
-        }
+        Vector<Ref<Camera>> m_cameras;
+        Ref<Texture> m_view_rt;
+        Ref<Texture> m_view_depth;
+        Vector<uint32_t> m_selections;
+        Map<String, ByteBuffer> m_text_buffer;
     };
 }

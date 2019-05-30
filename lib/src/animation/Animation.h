@@ -17,13 +17,13 @@
 
 #pragma once
 
-#include "Node.h"
+#include "Component.h"
 #include "AnimationCurve.h"
 #include "container/List.h"
 
 namespace Viry3D
 {
-    enum class CurvePropertyType
+    enum class AnimationCurvePropertyType
     {
         Unknown = 0,
 
@@ -37,13 +37,20 @@ namespace Viry3D
         LocalScaleX,
         LocalScaleY,
         LocalScaleZ,
+        BlendShape,
+    };
+    
+    struct AnimationCurveProperty
+    {
+        AnimationCurvePropertyType type;
+        String name;
+        AnimationCurve curve;
     };
 
     struct AnimationCurveWrapper
     {
         String path;
-        Vector<CurvePropertyType> property_types;
-        Vector<AnimationCurve> curves;
+        Vector<AnimationCurveProperty> properties;
     };
 
     enum class AnimationWrapMode
@@ -55,8 +62,13 @@ namespace Viry3D
         ClampForever = 8,
     };
 
-    struct AnimationClip
+    class AnimationClip : public Object
     {
+	public:
+		AnimationClip(): length(0), fps(0), wrap_mode(AnimationWrapMode::Default) { }
+		virtual ~AnimationClip() { }
+
+	public:
         String name;
         float length;
         float fps;
@@ -75,7 +87,7 @@ namespace Viry3D
     {
         int clip_index;
         float play_start_time;
-        Vector<Node*> targets;
+        Vector<Transform*> targets;
         FadeState fade_state;
         float fade_start_time;
         float fade_length;
@@ -83,23 +95,25 @@ namespace Viry3D
         float weight;
     };
 
-    class Animation : public Node
+    class Animation : public Component
     {
     public:
         Animation();
         virtual ~Animation();
-        void SetClips(Vector<AnimationClip>&& clips) { m_clips = std::move(clips); }
+		void SetClips(const Vector<Ref<AnimationClip>>& clips);
         int GetClipCount() const { return m_clips.Size(); }
         const String& GetClipName(int index) const;
-        void Play(int index, float fade_length);
+        void Play(int index, float fade_length = 0.3f);
         void Stop();
-        void Update();
 
+    protected:
+        virtual void Update();
+        
     private:
         void Sample(AnimationState& state, float time, float weight, bool first_state, bool last_state);
 
     private:
-        Vector<AnimationClip> m_clips;
+        Vector<Ref<AnimationClip>> m_clips;
         List<AnimationState> m_states;
     };
 }

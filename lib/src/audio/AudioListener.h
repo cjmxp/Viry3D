@@ -17,19 +17,19 @@
 
 #pragma once
 
-#include "Node.h"
+#include "Component.h"
 
 namespace Viry3D
 {
     class AudioListenerPrivate;
 
-    class AudioListener : public Node
+    class AudioListener : public Component
     {
     public:
         virtual ~AudioListener();
 
     protected:
-        virtual void OnMatrixDirty();
+        virtual void OnTransformDirty();
 
     private:
         friend class AudioManager;

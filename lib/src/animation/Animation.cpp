@@ -16,7 +16,10 @@
 */
 
 #include "Animation.h"
+#include "GameObject.h"
 #include "time/Time.h"
+#include "math/Mathf.h"
+#include "graphics/SkinnedMeshRenderer.h"
 
 namespace Viry3D
 {
@@ -30,9 +33,16 @@ namespace Viry3D
     
     }
 
+	void Animation::SetClips(const Vector<Ref<AnimationClip>>& clips)
+	{
+		m_clips = clips;
+
+		m_states.Clear();
+	}
+
     const String& Animation::GetClipName(int index) const
     {
-        return m_clips[index].name;
+        return m_clips[index]->name;
     }
 
     void Animation::Play(int index, float fade_length)
@@ -91,9 +101,9 @@ namespace Viry3D
         {
             auto& state = *i;
             float time = Time::GetTime() - state.play_start_time;
-            const auto& clip = m_clips[state.clip_index];
+            const auto& clip = *m_clips[state.clip_index];
             bool remove_later = false;
-
+			
             if (time >= clip.length)
             {
                 switch (clip.wrap_mode)
@@ -178,7 +188,7 @@ namespace Viry3D
 
     void Animation::Sample(AnimationState& state, float time, float weight, bool first_state, bool last_state)
     {
-        const auto& clip = m_clips[state.clip_index];
+        const auto& clip = *m_clips[state.clip_index];
         if (state.targets.Size() == 0)
         {
             state.targets.Resize(clip.curves.Size(), nullptr);
@@ -187,14 +197,14 @@ namespace Viry3D
         for (int i = 0; i < clip.curves.Size(); ++i)
         {
             const auto& curve = clip.curves[i];
-            Node* target = state.targets[i];
+            Transform* target = state.targets[i];
             if (target == nullptr)
             {
-                target = this->Find(curve.path).get();
-                state.targets[i] = target;
-                if (target)
+                auto find = this->GetTransform()->Find(curve.path);
+                if (find)
                 {
-                    target->EnableNotifyChildrenOnMatrixDirty(false);
+                    target = find.get();
+                    state.targets[i] = target;
                 }
                 else
                 {
@@ -209,57 +219,67 @@ namespace Viry3D
             bool set_rot = false;
             bool set_scale = false;
 
-            for (int j = 0; j < curve.property_types.Size(); ++j)
+            for (int j = 0; j < curve.properties.Size(); ++j)
             {
-                auto type = curve.property_types[j];
-                float value = curve.curves[j].Evaluate(time);
+                auto type = curve.properties[j].type;
+                float value = curve.properties[j].curve.Evaluate(time);
 
                 switch (type)
                 {
-                    case CurvePropertyType::LocalPositionX:
+                    case AnimationCurvePropertyType::LocalPositionX:
                         local_pos.x = value;
                         set_pos = true;
                         break;
-                    case CurvePropertyType::LocalPositionY:
+                    case AnimationCurvePropertyType::LocalPositionY:
                         local_pos.y = value;
                         set_pos = true;
                         break;
-                    case CurvePropertyType::LocalPositionZ:
+                    case AnimationCurvePropertyType::LocalPositionZ:
                         local_pos.z = value;
                         set_pos = true;
                         break;
 
-                    case CurvePropertyType::LocalRotationX:
+                    case AnimationCurvePropertyType::LocalRotationX:
                         local_rot.x = value;
                         set_rot = true;
                         break;
-                    case CurvePropertyType::LocalRotationY:
+                    case AnimationCurvePropertyType::LocalRotationY:
                         local_rot.y = value;
                         set_rot = true;
                         break;
-                    case CurvePropertyType::LocalRotationZ:
+                    case AnimationCurvePropertyType::LocalRotationZ:
                         local_rot.z = value;
                         set_rot = true;
                         break;
-                    case CurvePropertyType::LocalRotationW:
+                    case AnimationCurvePropertyType::LocalRotationW:
                         local_rot.w = value;
                         set_rot = true;
                         break;
 
-                    case CurvePropertyType::LocalScaleX:
+                    case AnimationCurvePropertyType::LocalScaleX:
                         local_scale.x = value;
                         set_scale = true;
                         break;
-                    case CurvePropertyType::LocalScaleY:
+                    case AnimationCurvePropertyType::LocalScaleY:
                         local_scale.y = value;
                         set_scale = true;
                         break;
-                    case CurvePropertyType::LocalScaleZ:
+                    case AnimationCurvePropertyType::LocalScaleZ:
                         local_scale.z = value;
                         set_scale = true;
                         break;
-
-                    case CurvePropertyType::Unknown:
+                        
+                    case AnimationCurvePropertyType::BlendShape:
+					{
+						auto skin = target->GetGameObject()->GetComponent<SkinnedMeshRenderer>();
+						if (skin)
+						{
+							String blend_shape_name = curve.properties[j].name.Substring(String("blendShape.").Size());
+							skin->SetBlendShapeWeight(blend_shape_name, value / 100.0f);
+						}
+						break;
+					}
+                    case AnimationCurvePropertyType::Unknown:
                         break;
                 }
             }

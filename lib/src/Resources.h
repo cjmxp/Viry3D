@@ -18,17 +18,20 @@
 #pragma once
 
 #include "string/String.h"
-#include "container/Vector.h"
+#include "GameObject.h"
+#include "graphics/Texture.h"
+#include "graphics/Mesh.h"
+#include "container/Map.h"
 
 namespace Viry3D
 {
-    class Node;
-    class Texture;
-
     class Resources
     {
     public:
-        static Ref<Node> LoadNode(const String& path);
+		static void Init();
+		static void Done();
+        static Ref<GameObject> LoadGameObject(const String& path);
+		static Ref<Mesh> LoadMesh(const String& path);
         static Ref<Texture> LoadTexture(const String& path);
         static Ref<Texture> LoadLightmap(const String& path);
     };

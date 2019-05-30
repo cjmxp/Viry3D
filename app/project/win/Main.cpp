@@ -15,11 +15,10 @@
 * limitations under the License.
 */
 
-#include "graphics/Display.h"
-#include "App.h"
+#include "Engine.h"
 #include "Input.h"
 #include "time/Time.h"
-#include "imgui/imgui.h"
+#include "container/List.h"
 #include <Windows.h>
 #include <windowsx.h>
 
@@ -40,6 +39,7 @@ static bool g_mouse_down = false;
 static bool g_minimized = false;
 static int g_window_width;
 static int g_window_height;
+static Engine* g_engine;
 
 static int GetKeyCode(int wParam)
 {
@@ -207,6 +207,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
     switch (uMsg)
     {
         case WM_CLOSE:
+			Engine::Destroy(&g_engine);
             DestroyWindow(hWnd);
             break;
 
@@ -218,16 +219,10 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             if (wParam == SIZE_MINIMIZED)
             {
                 g_minimized = true;
-
-                Display::Instance()->OnPause();
             }
             else
             {
-                if (g_minimized)
-                {
-                    Display::Instance()->OnResume();
-                }
-                else
+                if (!g_minimized)
                 {
                     int width = lParam & 0xffff;
                     int height = (lParam & 0xffff0000) >> 16;
@@ -329,11 +324,6 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             if (wParam > 0 && wParam < 0x10000)
             {
                 unsigned short c = (unsigned short) wParam;
-                if (ImGui::GetCurrentContext())
-                {
-                    ImGuiIO& io = ImGui::GetIO();
-                    io.AddInputCharacter(c);
-                }
                 Input::AddInputCharacter(c);
             }
             break;
@@ -358,7 +348,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
                 t.deltaTime = 0;
                 t.fingerId = 0;
                 t.phase = TouchPhase::Began;
-                t.position = Vector2((float) x, (float) Display::Instance()->GetHeight() - y - 1);
+                t.position = Vector2((float) x, (float) g_window_height - y - 1);
                 t.tapCount = 1;
                 t.time = Time::GetRealTimeSinceStartup();
 
@@ -376,7 +366,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
             g_mouse_button_down[0] = true;
             g_mouse_position.x = (float) x;
-            g_mouse_position.y = (float) Display::Instance()->GetHeight() - y - 1;
+            g_mouse_position.y = (float) g_window_height - y - 1;
             g_mouse_button_held[0] = true;
 
             break;
@@ -389,7 +379,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
             g_mouse_button_down[1] = true;
             g_mouse_position.x = (float) x;
-            g_mouse_position.y = (float) Display::Instance()->GetHeight() - y - 1;
+            g_mouse_position.y = (float) g_window_height - y - 1;
             g_mouse_button_held[1] = true;
 
             break;
@@ -402,7 +392,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
             g_mouse_button_down[2] = true;
             g_mouse_position.x = (float) x;
-            g_mouse_position.y = (float) Display::Instance()->GetHeight() - y - 1;
+            g_mouse_position.y = (float) g_window_height - y - 1;
             g_mouse_button_held[2] = true;
 
             break;
@@ -420,7 +410,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
                 t.deltaTime = 0;
                 t.fingerId = 0;
                 t.phase = TouchPhase::Moved;
-                t.position = Vector2((float) x, (float) Display::Instance()->GetHeight() - y - 1);
+                t.position = Vector2((float) x, (float) g_window_height - y - 1);
                 t.tapCount = 1;
                 t.time = Time::GetRealTimeSinceStartup();
 
@@ -428,7 +418,14 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
                 {
                     if (g_input_touch_buffer.Empty())
                     {
-                        g_input_touch_buffer.AddLast(t);
+                        if (g_input_touches[0].phase == TouchPhase::Moved)
+                        {
+                            g_input_touches[0] = t;
+                        }
+                        else
+                        {
+                            g_input_touch_buffer.AddLast(t);
+                        }
                     }
                     else
                     {
@@ -449,7 +446,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             }
 
             g_mouse_position.x = (float) x;
-            g_mouse_position.y = (float) Display::Instance()->GetHeight() - y - 1;
+            g_mouse_position.y = (float) g_window_height - y - 1;
 
             break;
         }
@@ -466,7 +463,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
                 t.deltaTime = 0;
                 t.fingerId = 0;
                 t.phase = TouchPhase::Ended;
-                t.position = Vector2((float) x, (float) Display::Instance()->GetHeight() - y - 1);
+                t.position = Vector2((float) x, (float) g_window_height - y - 1);
                 t.tapCount = 1;
                 t.time = Time::GetRealTimeSinceStartup();
 
@@ -484,7 +481,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
             g_mouse_button_up[0] = true;
             g_mouse_position.x = (float) x;
-            g_mouse_position.y = (float) Display::Instance()->GetHeight() - y - 1;
+            g_mouse_position.y = (float) g_window_height - y - 1;
             g_mouse_button_held[0] = false;
 
             break;
@@ -497,7 +494,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
             g_mouse_button_up[1] = true;
             g_mouse_position.x = (float) x;
-            g_mouse_position.y = (float) Display::Instance()->GetHeight() - y - 1;
+            g_mouse_position.y = (float) g_window_height - y - 1;
             g_mouse_button_held[1] = false;
 
             break;
@@ -510,7 +507,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
             g_mouse_button_up[2] = true;
             g_mouse_position.x = (float) x;
-            g_mouse_position.y = (float) Display::Instance()->GetHeight() - y - 1;
+            g_mouse_position.y = (float) g_window_height - y - 1;
             g_mouse_button_held[2] = false;
 
             break;
@@ -533,8 +530,10 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
     String name = "Viry3D";
-    int window_width = 1280;
-    int window_height = 720;
+    //int window_width = 1920;
+    //int window_height = 1040;
+	int window_width = 1280;
+	int window_height = 720;
 
     WNDCLASSEX win_class;
     ZeroMemory(&win_class, sizeof(win_class));
@@ -565,6 +564,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     int x = (GetSystemMetrics(SM_CXSCREEN) - window_width) / 2 + wr.left;
     int y = (GetSystemMetrics(SM_CYSCREEN) - window_height) / 2 + wr.top;
+    int w = wr.right - wr.left;
+    int h = wr.bottom - wr.top;
+
+    if (GetSystemMetrics(SM_CXSCREEN) == window_width)
+    {
+        x = wr.left;
+        y = wr.top;
+    }
 
     HWND hwnd = CreateWindowEx(
         style_ex,			// window ex style
@@ -572,8 +579,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         name.CString(),		// app name
         style,			    // window style
         x, y,				// x, y
-        wr.right - wr.left, // width
-        wr.bottom - wr.top, // height
+        w, h,               // w, h
         nullptr,		    // handle to parent
         nullptr,            // handle to menu
         hInstance,			// hInstance
@@ -585,14 +591,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ShowWindow(hwnd, SW_SHOW);
 
-    Display* display = new Display(name, hwnd, window_width, window_height);
-
-    App* app = new App();
-    app->SetName(name);
-    app->Init();
-
     g_window_width = window_width;
     g_window_height = window_height;
+
+	g_engine = Engine::Create(hwnd, g_window_width, g_window_height);
 
     bool exit = false;
     MSG msg;
@@ -601,7 +603,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     {
         while (::PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
-            if (WM_QUIT == msg.message)
+            if (msg.message == WM_QUIT)
             {
                 exit = true;
                 break;
@@ -618,29 +620,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             break;
         }
 
-        if (g_window_width != display->GetWidth() || g_window_height != display->GetHeight())
-        {
-            display->OnResize(g_window_width, g_window_height);
-        }
+		if (g_minimized)
+		{
+			continue;
+		}
 
-        app->OnFrameBegin();
+		if (g_engine)
+		{
+			if (g_window_width != g_engine->GetWidth() || g_window_height != g_engine->GetHeight())
+			{
+				g_engine->OnResize(hwnd, g_window_width, g_window_height);
+			}
 
-        app->Update();
+			g_engine->Execute();
 
-        if (app->HasQuit())
-        {
-            SendMessage(hwnd, WM_CLOSE, 0, 0);
-        }
-        else
-        {
-            display->OnDraw();
-        }
-
-        app->OnFrameEnd();
+			if (g_engine->HasQuit())
+			{
+				SendMessage(hwnd, WM_CLOSE, 0, 0);
+			}
+		}
     }
 
-    delete app;
-    delete display;
+#ifndef NDEBUG
+	int alloc_size = Memory::GetAllocSize();
+	int new_size = Memory::GetNewSize();
+	assert(alloc_size == 0);
+	assert(new_size == 0);
+#endif
 
     return 0;
 }

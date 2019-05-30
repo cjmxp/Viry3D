@@ -16,8 +16,7 @@
 */
 
 #include "Resources.h"
-#include "Node.h"
-#include "Application.h"
+#include "Engine.h"
 #include "io/File.h"
 #include "io/MemoryStream.h"
 #include "graphics/MeshRenderer.h"
@@ -25,13 +24,24 @@
 #include "graphics/Mesh.h"
 #include "graphics/Material.h"
 #include "graphics/Shader.h"
+#include "graphics/Image.h"
 #include "graphics/Texture.h"
 #include "animation/Animation.h"
 #include "json/json.h"
 
 namespace Viry3D
 {
-    static Map<String, Ref<Object>> g_loading_cache;
+	static Map<String, Ref<Object>> g_cache;
+
+	void Resources::Init()
+	{
+	
+	}
+
+	void Resources::Done()
+	{
+		g_cache.Clear();
+	}
 
     static String ReadString(MemoryStream& ms)
     {
@@ -41,14 +51,14 @@ namespace Viry3D
 
     static Ref<Texture> ReadTexture(const String& path)
     {
-        if (g_loading_cache.Contains(path))
+        if (g_cache.Contains(path))
         {
-            return RefCast<Texture>(g_loading_cache[path]);
+            return RefCast<Texture>(g_cache[path]);
         }
 
         Ref<Texture> texture;
 
-        String full_path = Application::Instance()->GetDataPath() + "/" + path;
+        String full_path = Engine::Instance()->GetDataPath() + "/" + path;
         if (File::Exist(full_path))
         {
             String json = File::ReadAllText(full_path);
@@ -71,7 +81,7 @@ namespace Viry3D
                     int mipmap_count = root["mipmap"].asInt();
                     String png_path = root["path"].asCString();
 
-                    texture = Texture::LoadTexture2DFromFile(Application::Instance()->GetDataPath() + "/" + png_path, filter_mode, wrap_mode, mipmap_count > 1, false);
+                    texture = Texture::LoadTexture2DFromFile(Engine::Instance()->GetDataPath() + "/" + png_path, filter_mode, wrap_mode, mipmap_count > 1);
                     texture->SetName(texture_name);
                 }
                 else if (texture_type == "Cubemap")
@@ -79,54 +89,79 @@ namespace Viry3D
                     int mipmap_count = root["mipmap"].asInt();
                     Json::Value levels = root["levels"];
 
+                    assert(width == height);
+                    
                     texture = Texture::CreateCubemap(width, TextureFormat::R8G8B8A8, filter_mode, wrap_mode, mipmap_count > 1);
 
                     for (int i = 0; i < mipmap_count; ++i)
                     {
                         Json::Value faces = levels[i];
+						ByteBuffer buffer;
+						Vector<int> offsets(6);
 
                         for (int j = 0; j < 6; ++j)
                         {
                             String face_path = faces[j].asCString();
 
-                            Ref<Image> image = Texture::LoadImageFromFile(Application::Instance()->GetDataPath() + "/" + face_path);
-                            texture->UpdateCubemap(image->data, (CubemapFace) j, i);
+                            Ref<Image> image = Image::LoadFromFile(Engine::Instance()->GetDataPath() + "/" + face_path);
+							if (image)
+							{
+								if (buffer.Size() == 0)
+								{
+									buffer = ByteBuffer(image->data.Size() * 6);
+								}
+								Memory::Copy(&buffer[j * image->data.Size()], image->data.Bytes(), image->data.Size());
+								offsets[j] = j * image->data.Size();
+							}
                         }
+
+						if (buffer.Size() > 0)
+						{
+							texture->UpdateCubemap(buffer, i, offsets);
+						}
                     }
                 }
             }
         }
 
-        g_loading_cache.Add(path, texture);
+		g_cache.Add(path, texture);
 
         return texture;
     }
 
     static Ref<Material> ReadMaterial(const String& path)
     {
-        if (g_loading_cache.Contains(path))
+        if (g_cache.Contains(path))
         {
-            return RefCast<Material>(g_loading_cache[path]);
+            return RefCast<Material>(g_cache[path]);
         }
 
         Ref<Material> material;
 
-        String full_path = Application::Instance()->GetDataPath() + "/" + path;
+        String full_path = Engine::Instance()->GetDataPath() + "/" + path;
         if (File::Exist(full_path))
         {
             MemoryStream ms(File::ReadAllBytes(full_path));
 
             String material_name = ReadString(ms);
             String shader_name = ReadString(ms);
-            int property_count = ms.Read<int>();
-
-            Ref<Shader> shader = Shader::Find(shader_name);
+            
+            int keyword_count = ms.Read<int>();
+            Vector<String> keywords;
+            for (int i = 0; i < keyword_count; ++i)
+            {
+                String keyword = ReadString(ms);
+                keywords.Add(keyword);
+            }
+            
+            Ref<Shader> shader = Shader::Find(shader_name, keywords);
             if (shader)
             {
                 material = RefMake<Material>(shader);
                 material->SetName(material_name);
             }
-
+            
+            int property_count = ms.Read<int>();
             for (int i = 0; i < property_count; ++i)
             {
                 String property_name = ReadString(ms);
@@ -165,6 +200,8 @@ namespace Viry3D
                     case MaterialProperty::Type::Texture:
                     {
                         Vector4 uv_scale_offset = ms.Read<Vector4>();
+                        (void) uv_scale_offset;
+                        
                         String texture_path = ReadString(ms);
                         if (texture_path.Size() > 0)
                         {
@@ -176,11 +213,13 @@ namespace Viry3D
                         }
                         break;
                     }
+                    default:
+                        break;
                 }
             }
         }
 
-        g_loading_cache.Add(path, material);
+		g_cache.Add(path, material);
 
         return material;
     }
@@ -216,13 +255,30 @@ namespace Viry3D
         }
     }
 
+	static Ref<Mesh> ReadMesh(const String& path)
+	{
+		if (g_cache.Contains(path))
+		{
+			return RefCast<Mesh>(g_cache[path]);
+		}
+
+		Ref<Mesh> mesh = Mesh::LoadFromFile(Engine::Instance()->GetDataPath() + "/" + path);
+
+		g_cache.Add(path, mesh);
+
+		return mesh;
+	}
+
     static void ReadMeshRenderer(MemoryStream& ms, const Ref<MeshRenderer>& renderer)
     {
         ReadRenderer(ms, renderer);
 
         String mesh_path = ReadString(ms);
-        auto mesh = Mesh::LoadFromFile(Application::Instance()->GetDataPath() + "/" + mesh_path);
-        renderer->SetMesh(mesh);
+		if (mesh_path.Size() > 0)
+		{
+			auto mesh = ReadMesh(mesh_path);
+			renderer->SetMesh(mesh);
+		}
     }
 
     static void ReadSkinnedMeshRenderer(MemoryStream& ms, const Ref<SkinnedMeshRenderer>& renderer)
@@ -239,83 +295,120 @@ namespace Viry3D
         renderer->SetBonePaths(bones);
     }
 
+	static Ref<AnimationClip> ReadAnimationClip(const String& path)
+	{
+		if (g_cache.Contains(path))
+		{
+			return RefCast<AnimationClip>(g_cache[path]);
+		}
+
+		Ref<AnimationClip> clip;
+
+		String full_path = Engine::Instance()->GetDataPath() + "/" + path;
+		if (File::Exist(full_path))
+		{
+			MemoryStream ms(File::ReadAllBytes(full_path));
+
+			clip = RefMake<AnimationClip>();
+
+			String clip_name = ReadString(ms);
+			float clip_length = ms.Read<float>();
+			float clip_fps = ms.Read<float>();
+			int clip_wrap_mode = ms.Read<int>();
+			int curve_count = ms.Read<int>();
+
+			clip->name = clip_name;
+			clip->length = clip_length;
+			clip->fps = clip_fps;
+			clip->wrap_mode = (AnimationWrapMode) clip_wrap_mode;
+
+			for (int j = 0; j < curve_count; ++j)
+			{
+				String curve_path = ReadString(ms);
+				AnimationCurvePropertyType property_type = (AnimationCurvePropertyType) ms.Read<int>();
+				String property_name = ReadString(ms);
+				int key_count = ms.Read<int>();
+
+				AnimationCurveWrapper* curve = nullptr;
+				for (int k = 0; k < clip->curves.Size(); ++k)
+				{
+					if (clip->curves[k].path == curve_path)
+					{
+						curve = &clip->curves[k];
+						break;
+					}
+				}
+				if (curve == nullptr)
+				{
+					AnimationCurveWrapper new_path_curve;
+					new_path_curve.path = curve_path;
+					clip->curves.Add(new_path_curve);
+					curve = &clip->curves[clip->curves.Size() - 1];
+				}
+
+				AnimationCurveProperty property;
+				property.type = property_type;
+				property.name = property_name;
+
+				curve->properties.Add(property);
+
+				AnimationCurve* anim_curve = &curve->properties[curve->properties.Size() - 1].curve;
+
+				for (int k = 0; k < key_count; ++k)
+				{
+					float time = ms.Read<float>();
+					float value = ms.Read<float>();
+					float in_tangent = ms.Read<float>();
+					float out_tangent = ms.Read<float>();
+
+					anim_curve->AddKey(time, value, in_tangent, out_tangent);
+				}
+			}
+		}
+
+		g_cache.Add(path, clip);
+
+		return clip;
+	}
+
     static void ReadAnimation(MemoryStream& ms, const Ref<Animation>& animation)
     {
         int clip_count = ms.Read<int>();
 
-        Vector<AnimationClip> clips(clip_count);
+        Vector<Ref<AnimationClip>> clips(clip_count);
 
         for (int i = 0; i < clip_count; ++i)
         {
-            String clip_name = ReadString(ms);
-            float clip_length = ms.Read<float>();
-            float clip_fps = ms.Read<float>();
-            int clip_wrap_mode = ms.Read<int>();
-            int curve_count = ms.Read<int>();
-
-            AnimationClip& clip = clips[i];
-            clip.name = clip_name;
-            clip.length = clip_length;
-            clip.fps = clip_fps;
-            clip.wrap_mode = (AnimationWrapMode) clip_wrap_mode;
-
-            for (int j = 0; j < curve_count; ++j)
-            {
-                String curve_path = ReadString(ms);
-                int property_type = ms.Read<int>();
-                int key_count = ms.Read<int>();
-
-                AnimationCurveWrapper* curve = nullptr;
-                for (int k = 0; k < clip.curves.Size(); ++k)
-                {
-                    if (clip.curves[k].path == curve_path)
-                    {
-                        curve = &clip.curves[k];
-                        break;
-                    }
-                }
-                if (curve == nullptr)
-                {
-                    AnimationCurveWrapper new_path_curve;
-                    new_path_curve.path = curve_path;
-                    clip.curves.Add(new_path_curve);
-                    curve = &clip.curves[clip.curves.Size() - 1];
-                }
-                
-                curve->property_types.Add((CurvePropertyType) property_type);
-                curve->curves.Add(AnimationCurve());
-
-                AnimationCurve* anim_curve = &curve->curves[curve->curves.Size() - 1];
-
-                for (int k = 0; k < key_count; ++k)
-                {
-                    float time = ms.Read<float>();
-                    float value = ms.Read<float>();
-                    float in_tangent = ms.Read<float>();
-                    float out_tangent = ms.Read<float>();
-
-                    anim_curve->AddKey(time, value, in_tangent, out_tangent);
-                }
-            }
+			String clip_path = ReadString(ms);
+			if (clip_path.Size() > 0)
+			{
+				clips[i] = ReadAnimationClip(clip_path);
+			}
         }
 
-        animation->SetClips(std::move(clips));
+        animation->SetClips(clips);
     }
 
-    static Ref<Node> ReadNode(MemoryStream& ms, const Ref<Node>& parent)
+    static Ref<GameObject> ReadGameObject(MemoryStream& ms, const Ref<GameObject>& parent)
     {
-        Ref<Node> node;
-
         String name = ReadString(ms);
         int layer = ms.Read<int>();
         bool active = ms.Read<byte>() == 1;
+		Vector3 local_pos = ms.Read<Vector3>();
+		Quaternion local_rot = ms.Read<Quaternion>();
+		Vector3 local_scale = ms.Read<Vector3>();
 
-        (void) layer;
-        (void) active;
+		Ref<GameObject> obj = GameObject::Create(name);
+		obj->SetLayer(layer);
+		obj->SetActive(active);
 
-        Vector3 local_pos = ms.Read<Vector3>();
-        Quaternion local_rot = ms.Read<Quaternion>();
-        Vector3 local_scale = ms.Read<Vector3>();
+		if (parent)
+		{
+			obj->GetTransform()->SetParent(parent->GetTransform());
+		}
+		obj->GetTransform()->SetLocalPosition(local_pos);
+		obj->GetTransform()->SetLocalRotation(local_rot);
+		obj->GetTransform()->SetLocalScale(local_scale);
 
         int com_count = ms.Read<int>();
         for (int i = 0; i < com_count; ++i)
@@ -324,79 +417,62 @@ namespace Viry3D
 
             if (com_name == "MeshRenderer")
             {
-                assert(!node);
-
-                auto com = RefMake<MeshRenderer>();
+				auto com = obj->AddComponent<MeshRenderer>();
                 ReadMeshRenderer(ms, com);
-                node = com;
             }
             else if (com_name == "SkinnedMeshRenderer")
             {
-                assert(!node);
-
-                auto com = RefMake<SkinnedMeshRenderer>();
+				auto com = obj->AddComponent<SkinnedMeshRenderer>();
                 ReadSkinnedMeshRenderer(ms, com);
-                node = com;
 
                 if (parent)
                 {
-                    com->SetBonesRoot(Node::GetRoot(parent));
+                    com->SetBonesRoot(parent->GetTransform()->GetRoot());
                 }
                 else
                 {
-                    com->SetBonesRoot(com);
+                    com->SetBonesRoot(obj->GetTransform());
                 }
             }
             else if (com_name == "Animation")
             {
-                assert(!node);
-
-                auto com = RefMake<Animation>();
+				auto com = obj->AddComponent<Animation>();
                 ReadAnimation(ms, com);
-                node = com;
             }
         }
 
-        if (!node)
-        {
-            node = RefMake<Node>();
-        }
+		int child_count = ms.Read<int>();
+		for (int i = 0; i < child_count; ++i)
+		{
+			ReadGameObject(ms, obj);
+		}
 
-        if (parent)
-        {
-            Node::SetParent(node, parent);
-        }
-
-        node->SetName(name);
-        node->SetLocalPosition(local_pos);
-        node->SetLocalRotation(local_rot);
-        node->SetLocalScale(local_scale);
-
-        int child_count = ms.Read<int>();
-        for (int i = 0; i < child_count; ++i)
-        {
-            ReadNode(ms, node);
-        }
-
-        return node;
+        return obj;
     }
 
-    Ref<Node> Resources::LoadNode(const String& path)
+    Ref<GameObject> Resources::LoadGameObject(const String& path)
     {
-        Ref<Node> node;
+		Ref<GameObject> obj;
 
-        String full_path = Application::Instance()->GetDataPath() + "/" + path;
+        String full_path = Engine::Instance()->GetDataPath() + "/" + path;
         if (File::Exist(full_path))
         {
             MemoryStream ms(File::ReadAllBytes(full_path));
 
-            node = ReadNode(ms, Ref<Node>());
-
-            g_loading_cache.Clear();
+			obj = ReadGameObject(ms, Ref<GameObject>());
         }
 
-        return node;
+        return obj;
     }
+
+	Ref<Mesh> Resources::LoadMesh(const String& path)
+	{
+		Ref<Mesh> mesh;
+
+		mesh = ReadMesh(path);
+
+		return mesh;
+	}
 
     Ref<Texture> Resources::LoadTexture(const String& path)
     {
@@ -404,16 +480,19 @@ namespace Viry3D
 
         texture = ReadTexture(path);
 
-        g_loading_cache.Clear();
-
         return texture;
     }
 
     Ref<Texture> Resources::LoadLightmap(const String& path)
     {
+		if (g_cache.Contains(path))
+		{
+			return RefCast<Texture>(g_cache[path]);
+		}
+
         Ref<Texture> lightmap;
         
-        String full_path = Application::Instance()->GetDataPath() + "/" + path;
+        String full_path = Engine::Instance()->GetDataPath() + "/" + path;
         if (File::Exist(full_path))
         {
             MemoryStream ms(File::ReadAllBytes(full_path));
@@ -440,6 +519,7 @@ namespace Viry3D
 
             if (lightmap_count > 0)
             {
+				/*
                 Vector<ByteBuffer> pixels(lightmap_count);
                 for (int i = 0; i < lightmap_count; ++i)
                 {
@@ -454,8 +534,6 @@ namespace Viry3D
                             TextureFormat::R8G8B8A8,
                             FilterMode::Linear,
                             SamplerAddressMode::ClampToEdge,
-                            false,
-                            false,
                             false);
                         temp->CopyTexture(
                             textures[i],
@@ -482,10 +560,11 @@ namespace Viry3D
                     SamplerAddressMode::ClampToEdge,
                     false,
                     false);
+				*/
             }
-
-            g_loading_cache.Clear();
         }
+
+		g_cache.Add(path, lightmap);
 
         return lightmap;
     }

@@ -19,7 +19,7 @@
 
 #include "math/Vector3.h"
 #include "graphics/Color.h"
-#include "graphics/Texture.h"
+#include "graphics/Image.h"
 
 namespace Viry3D
 {
@@ -64,6 +64,6 @@ namespace Viry3D
     class CubeMapToSphericalPolynomialTools
     {
     public:
-        static SphericalPolynomial ConvertCubeMapToSphericalPolynomial(int size, TextureFormat format, const Vector<ByteBuffer>& faces, bool gamma_space);
+        static SphericalPolynomial ConvertCubeMapToSphericalPolynomial(int size, ImageFormat format, const Vector<ByteBuffer>& faces, bool gamma_space);
     };
 }

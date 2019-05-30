@@ -36,10 +36,38 @@ set(CMAKE_C_FLAGS
     "${CMAKE_C_FLAGS} -DFT2_BUILD_LIBRARY -DAL_LIBTYPE_STATIC -DAL_ALEXT_PROTOTYPES -DFPM_DEFAULT -DSIZEOF_INT=4")
 
 set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} -std=c++11 -DFT2_BUILD_LIBRARY -DAL_LIBTYPE_STATIC -DAL_ALEXT_PROTOTYPES -DFPM_DEFAULT -DSIZEOF_INT=4")
+    "${CMAKE_CXX_FLAGS} -DFT2_BUILD_LIBRARY -DAL_LIBTYPE_STATIC -DAL_ALEXT_PROTOTYPES -DFPM_DEFAULT -DSIZEOF_INT=4")
 
 file(GLOB VIRY3D_DEP_SRCS
      ${VIRY3D_LIB_SRC_DIR}/crypto/md5/md5.c
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/noop/NoopDriver.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/noop/PlatformNoop.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/gl_headers.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/GLUtils.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLBlitter.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLDriver.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLPlatform.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLProgram.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/CircularBuffer.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/CommandBufferQueue.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/CommandStream.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/Driver.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/Handle.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/Platform.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/Program.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/SamplerGroup.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/TextureReshaper.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/Allocator.cpp
+     ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/ashmem.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/CallStack.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/CountDownLatch.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/CString.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/Log.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/ostream.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/Panic.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/Profiler.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/sstream.cpp
+     ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/Systrace.cpp
      ${VIRY3D_LIB_SRC_DIR}/freetype/src/autofit/autofit.c
      ${VIRY3D_LIB_SRC_DIR}/freetype/src/base/ftbase.c
      ${VIRY3D_LIB_SRC_DIR}/freetype/src/base/ftbbox.c
@@ -156,6 +184,11 @@ target_include_directories(Viry3DDep PRIVATE
                            ${VIRY3D_LIB_SRC_DIR}
                            ${VIRY3D_LIB_SRC_DIR}/freetype/include
                            ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
+						   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/include
+						   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src
+						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/include
+						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/math/include
+						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/include
                            )
 
 file(GLOB VIRY3D_LIB_SRCS
@@ -171,8 +204,6 @@ file(GLOB VIRY3D_LIB_SRCS
      ${VIRY3D_LIB_SRC_DIR}/graphics/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/io/*.h
      ${VIRY3D_LIB_SRC_DIR}/io/*.cpp
-     ${VIRY3D_LIB_SRC_DIR}/luaapi/*.h
-     ${VIRY3D_LIB_SRC_DIR}/luaapi/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/math/*.h
      ${VIRY3D_LIB_SRC_DIR}/math/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/memory/*.h
@@ -183,8 +214,6 @@ file(GLOB VIRY3D_LIB_SRCS
      ${VIRY3D_LIB_SRC_DIR}/thread/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/time/*.h
      ${VIRY3D_LIB_SRC_DIR}/time/*.cpp
-     ${VIRY3D_LIB_SRC_DIR}/ui/*.h
-     ${VIRY3D_LIB_SRC_DIR}/ui/*.cpp
      )
 
 source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_LIB_SRCS})
@@ -200,15 +229,174 @@ target_include_directories(Viry3D PRIVATE
                            ${VIRY3D_LIB_SRC_DIR}/openal/OpenAL32/Include
                            ${VIRY3D_LIB_SRC_DIR}/physics/bullet/src
                            ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
+						   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/include
+						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/math/include
+						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/include
                            )
 
 file(GLOB VIRY3D_APP_SRCS
-     ${VIRY3D_APP_SRC_DIR}/Demo/*.h
-     ${VIRY3D_APP_SRC_DIR}/App.h
-     ${VIRY3D_APP_SRC_DIR}/App.cpp
      )
 
 source_group(TREE ${VIRY3D_APP_SRC_DIR}/.. FILES ${VIRY3D_APP_SRCS})
+
+# filament vulkan
+if ( ${Target} MATCHES "Windows" OR
+     ${Target} MATCHES "Android" )
+
+    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_VULKAN
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanBinder.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanBuffer.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanContext.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanDisposer.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanDriver.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanFboCache.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanHandles.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanPlatform.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanSamplerCache.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanStagePool.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/VulkanUtility.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluevk/src/BlueVK.cpp
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_VULKAN})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_VULKAN})
+
+    target_include_directories(Viry3DDep PRIVATE
+                               ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluevk/include
+							   ${VIRY3D_LIB_SRC_DIR}/filament/third_party/vkmemalloc/src
+                               )
+
+endif ()
+
+# glslang
+if (${Target} MATCHES "Windows" OR ${Target} MATCHES "UWP")
+
+    file(GLOB VIRY3D_DEP_SRCS_GLSLANG
+		 ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/GenericCodeGen/CodeGen.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/GenericCodeGen/Link.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/attribute.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Constant.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/glslang_tab.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/InfoSink.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Initialize.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Intermediate.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/intermOut.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/IntermTraverse.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/iomapper.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/limits.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/linkValidate.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/parseConst.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/ParseContextBase.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/ParseHelper.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/PoolAlloc.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/Pp.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpAtom.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpContext.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpScanner.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpTokens.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/propagateNoContraction.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/reflection.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/RemoveTree.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Scan.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/ShaderLang.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/SymbolTable.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Versions.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/OSDependent/Windows/ossource.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/OGLCompilersDLL/InitializeDll.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/disassemble.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/doc.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/GlslangToSpv.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/InReadableOrder.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/Logger.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/SpvBuilder.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/SpvPostProcess.cpp
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/SPVRemapper.cpp
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_GLSLANG})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_GLSLANG})
+
+    target_include_directories(Viry3DDep PRIVATE
+                               )
+
+endif ()
+
+# vulkan shader compiler
+if (${Target} MATCHES "Windows" OR ${Target} MATCHES "UWP" OR ${Target} MATCHES "Android")
+
+    file(GLOB VIRY3D_LIB_SRCS_VULKAN
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/*.h
+         ${VIRY3D_LIB_SRC_DIR}/vulkan/*.cpp
+         )
+
+	source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_LIB_SRCS_VULKAN})
+
+    target_sources(Viry3D PRIVATE ${VIRY3D_LIB_SRCS_VULKAN})
+
+    target_include_directories(Viry3D PRIVATE
+                               )
+
+endif ()
+
+# spirv_cross
+if (${Target} MATCHES "Windows" OR ${Target} MATCHES "UWP")
+
+    file(GLOB VIRY3D_DEP_SRCS_SPIRV_CROSS
+            ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cfg.cpp
+            ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cpp.cpp
+            ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cross.cpp
+            ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cross_util.cpp
+            ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_glsl.cpp
+            ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_hlsl.cpp
+            ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_msl.cpp
+            )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_SPIRV_CROSS})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_SPIRV_CROSS})
+
+endif ()
+
+# filament metal
+if ( ${Target} MATCHES "Mac" OR
+     ${Target} MATCHES "iOS" )
+
+    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_METAL
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalBlitter.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalBufferPool.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalContext.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalDriver.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalExternalImage.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalHandles.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalResourceTracker.cpp
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalState.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/PlatformMetal.mm
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_METAL})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_METAL})
+
+endif ()
+
+# filament d3d
+if ( ${Target} MATCHES "Windows" OR
+     ${Target} MATCHES "UWP" )
+
+    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_D3D11
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Context.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Driver.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Handles.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/PlatformD3D11.cpp
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_D3D11})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_D3D11})
+
+endif ()
 
 # lua
 if ( TRUE )
@@ -441,20 +629,23 @@ if ( FALSE )
 endif ()
 
 # imgui
-if (${Target} MATCHES "Windows"
-    )
+if (FALSE)
+    if (${Target} MATCHES "Windows" OR
+        ${Target} MATCHES "Mac"
+        )
 
-    file(GLOB VIRY3D_DEP_SRCS_IMGUI
-         ${VIRY3D_LIB_SRC_DIR}/imgui/imgui.cpp
-         ${VIRY3D_LIB_SRC_DIR}/imgui/imgui_demo.cpp
-         ${VIRY3D_LIB_SRC_DIR}/imgui/imgui_draw.cpp
-         ${VIRY3D_LIB_SRC_DIR}/imgui/imgui_widgets.cpp
-         )
+        file(GLOB VIRY3D_DEP_SRCS_IMGUI
+             ${VIRY3D_LIB_SRC_DIR}/imgui/imgui.cpp
+             ${VIRY3D_LIB_SRC_DIR}/imgui/imgui_demo.cpp
+             ${VIRY3D_LIB_SRC_DIR}/imgui/imgui_draw.cpp
+             ${VIRY3D_LIB_SRC_DIR}/imgui/imgui_widgets.cpp
+             )
 
-    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_IMGUI})
+        source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_IMGUI})
 
-    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_IMGUI})
+        target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_IMGUI})
 
+    endif ()
 endif ()
 
 # zlib
@@ -554,7 +745,6 @@ if (${Target} MATCHES "Windows" OR ${Target} MATCHES "UWP" OR ${Target} MATCHES 
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcModulator.c
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcReverb.c
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcRing.c
-         ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcThread.c
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/ALu.c
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/bs2b.c
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/helpers.c
@@ -579,43 +769,10 @@ if (${Target} MATCHES "Windows" OR ${Target} MATCHES "UWP" OR ${Target} MATCHES 
 
 endif ()
 
-# spirv_cross
-if (${Target} MATCHES "Windows" OR ${Target} MATCHES "Android" OR ${Target} MATCHES "Mac" OR ${Target} MATCHES "iOS")
-
-    file(GLOB VIRY3D_DEP_SRCS_SPIRV_CROSS
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cfg.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cpp.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cross.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_cross_util.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_glsl.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_hlsl.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/spirv_cross/spirv_msl.cpp
-         )
-
-    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_SPIRV_CROSS})
-
-    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_SPIRV_CROSS})
-
-endif ()
-
-# vulkan shader compiler
-if (${Target} MATCHES "Windows" OR ${Target} MATCHES "Android")
-
-    file(GLOB VIRY3D_LIB_SRCS_VULKAN
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/*.h
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/*.cpp
-         )
-
-    target_sources(Viry3D PRIVATE ${VIRY3D_LIB_SRCS_VULKAN})
-
-    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_LIB_SRCS_VULKAN})
-
-endif ()
-
 if (${Target} MATCHES "Windows")
 
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -DVR_WINDOWS -DVR_VULKAN=1 -DVR_GLES=0 -DVK_USE_PLATFORM_WIN32_KHR")
+        "${CMAKE_CXX_FLAGS} -DVR_WINDOWS -DVR_VULKAN=1 -DVR_GLES=1 -DVR_D3D=1 -DVK_USE_PLATFORM_WIN32_KHR -DFILAMENT_DRIVER_SUPPORTS_VULKAN")
     set(EXECUTABLE_OUTPUT_PATH
         ${PROJECT_BINARY_DIR}/bin)
     add_definitions(-W3 -D_CRT_SECURE_NO_WARNINGS -D_CRT_RAND_S -D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES -DGLEW_STATIC)
@@ -625,46 +782,17 @@ if (${Target} MATCHES "Windows")
 
     file(GLOB VIRY3D_DEP_SRCS_WIN
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/backends/xaudio2.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/GenericCodeGen/CodeGen.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/GenericCodeGen/Link.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/attribute.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Constant.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/glslang_tab.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/InfoSink.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Initialize.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Intermediate.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/intermOut.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/IntermTraverse.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/iomapper.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/limits.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/linkValidate.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/parseConst.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/ParseContextBase.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/ParseHelper.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/PoolAlloc.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/Pp.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpAtom.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpContext.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpScanner.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/preprocessor/PpTokens.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/propagateNoContraction.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/reflection.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/RemoveTree.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Scan.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/ShaderLang.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/SymbolTable.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/MachineIndependent/Versions.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/glslang/OSDependent/Windows/ossource.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/OGLCompilersDLL/InitializeDll.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/disassemble.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/doc.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/GlslangToSpv.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/InReadableOrder.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/Logger.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/SpvBuilder.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/SpvPostProcess.cpp
-         ${VIRY3D_LIB_SRC_DIR}/vulkan/glslang/SPIRV/SPVRemapper.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcThread.c
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/PlatformWGL.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGL.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGLWindows.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGLCoreWindowsImpl.S
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/PlatformVkWindows.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluevk/src/BlueVKWindows.cpp
          )
+
+	enable_language(ASM_MASM)
+    set_property(SOURCE ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGLCoreWindowsImpl.S PROPERTY LANGUAGE ASM_MASM)
 
     source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_WIN})
 
@@ -675,8 +803,8 @@ if (${Target} MATCHES "Windows")
                                )
 
     target_include_directories(Viry3D PRIVATE
-                               ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/include
                                ${VIRY3D_LIB_SRC_DIR}/zlib
+							   ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluevk/include
                                )
 
     source_group(src FILES ${VIRY3D_APP_SRC_DIR}/../project/win/Main.cpp)
@@ -690,13 +818,13 @@ if (${Target} MATCHES "Windows")
                                ${VIRY3D_LIB_SRC_DIR}
                                ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
                                ${VIRY3D_APP_SRC_DIR}
-                               ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/include
                                )
 
     target_link_libraries(Viry3DApp
                           Viry3D Viry3DDep
-                          ${VIRY3D_LIB_SRC_DIR}/vulkan/vulkan_sdk/lib/${Arch}/vulkan-1.lib
                           opengl32.lib
+						  d3d11.lib
+						  d3dcompiler.lib
                           winmm.lib
                           Xaudio2.lib
                           )
@@ -720,12 +848,10 @@ if (${Target} MATCHES "Windows")
     target_include_directories(CubeMapToSphericalPolynomial PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}
                                ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
-                               ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/include
                                )
 
     target_link_libraries(CubeMapToSphericalPolynomial
                           Viry3D Viry3DDep
-                          ${VIRY3D_LIB_SRC_DIR}/vulkan/vulkan_sdk/lib/${Arch}/vulkan-1.lib
                           winmm.lib
                           Xaudio2.lib
                           )
@@ -737,13 +863,11 @@ if (${Target} MATCHES "Windows")
     target_include_directories(CubeMapCompress PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}
                                ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
-                               ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/include
                                ${VIRY3D_APP_SRC_DIR}/../project/CubeMapCompress/Compressonator/include
                                )
 
     target_link_libraries(CubeMapCompress
                           Viry3D Viry3DDep
-                          ${VIRY3D_LIB_SRC_DIR}/vulkan/vulkan_sdk/lib/${Arch}/vulkan-1.lib
                           winmm.lib
                           Xaudio2.lib
                           ${VIRY3D_APP_SRC_DIR}/../project/CubeMapCompress/Compressonator/lib/VS2015/${Arch}/Compressonator_MD_DLL.lib
@@ -756,54 +880,18 @@ if (${Target} MATCHES "Windows")
                        COMMAND copy /Y ${COMP_DLL_SRC} ${COMP_DLL_DST}
                        )
 
-    file(GLOB VIRY3D_APP_CANVAS_EDITOR_SRCS
-         ${VIRY3D_APP_SRC_DIR}/CanvasEditor/*.h
-         ${VIRY3D_APP_SRC_DIR}/App.h
-         ${VIRY3D_APP_SRC_DIR}/AppCanvasEditor.cpp
-         )
-
-    source_group(TREE ${VIRY3D_APP_SRC_DIR}/.. FILES ${VIRY3D_APP_CANVAS_EDITOR_SRCS})
-
-    add_executable(Viry3DAppCanvasEditor
-                   ${VIRY3D_APP_CANVAS_EDITOR_SRCS}
-                   ${VIRY3D_APP_SRC_DIR}/../project/win/Main.cpp
-                   )
-
-    target_include_directories(Viry3DAppCanvasEditor PRIVATE
-                               ${VIRY3D_LIB_SRC_DIR}
-                               ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
-                               ${VIRY3D_APP_SRC_DIR}
-                               ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/include
-                               )
-
-    target_link_libraries(Viry3DAppCanvasEditor
-                          Viry3D Viry3DDep
-                          ${VIRY3D_LIB_SRC_DIR}/vulkan/vulkan_sdk/lib/${Arch}/vulkan-1.lib
-                          opengl32.lib
-                          winmm.lib
-                          Xaudio2.lib
-                          )
-
-    set_property(TARGET Viry3DAppCanvasEditor PROPERTY LINK_FLAGS "/SUBSYSTEM:WINDOWS")
-
-    add_custom_command(TARGET Viry3DAppCanvasEditor
-                       POST_BUILD
-                       COMMAND if not exist ${ASSETS_LINK_LINK} (mklink /d ${ASSETS_LINK_LINK} ${ASSETS_LINK_TARGET})
-                       COMMAND copy /Y ${ICON_SRC} ${ICON_DST}
-                       )
-
 elseif (${Target} MATCHES "UWP")
 
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -DVR_UWP -DVR_VULKAN=0 -DVR_GLES=1")
-    add_definitions(-W3 -D_CRT_SECURE_NO_WARNINGS -D_CRT_RAND_S -D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES -DGLEW_STATIC)
+        "${CMAKE_CXX_FLAGS} -DVR_UWP -DVR_VULKAN=0 -DVR_GLES=0 -DVR_D3D=1")
+    add_definitions(-W3 -D_CRT_SECURE_NO_WARNINGS -D_CRT_RAND_S -D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES -DGLEW_STATIC /sdl-)
 
     set_property(GLOBAL PROPERTY USE_FOLDERS ON)
     set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
 
     file(GLOB VIRY3D_DEP_SRCS_UWP
          ${VIRY3D_LIB_SRC_DIR}/openal/Alc/backends/xaudio2.cpp
-         ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcThreadCpp11.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcThreadCpp11.cpp
          )
 
     source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_UWP})
@@ -812,6 +900,7 @@ elseif (${Target} MATCHES "UWP")
 
     target_include_directories(Viry3DDep PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}/openal/win
+							   ${VIRY3D_LIB_SRC_DIR}/gles/angle/include
                                )
 
     target_include_directories(Viry3D PRIVATE
@@ -887,24 +976,26 @@ elseif (${Target} MATCHES "Android")
     set_target_properties(shaderc_lib PROPERTIES IMPORTED_LOCATION
                           ${SHADERC_SRC}/libs/${ANDROID_STL}/${ANDROID_ABI}/libshaderc.a)
 
-    set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
-
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -DVR_ANDROID -DVR_VULKAN=1 -DVR_GLES=0 -DVK_USE_PLATFORM_ANDROID_KHR -fexceptions -frtti")
+        "${CMAKE_CXX_FLAGS} -std=c++14 -fexceptions -frtti -DVR_ANDROID -DVR_VULKAN=1 -DVR_GLES=1 -DVK_USE_PLATFORM_ANDROID_KHR -DFILAMENT_DRIVER_SUPPORTS_VULKAN")
     add_definitions(-Wall -DIOAPI_NO_64 -DHAVE_GCC_DESTRUCTOR)
 
     target_sources(Viry3DDep PRIVATE
                    ${VIRY3D_LIB_SRC_DIR}/openal/Alc/backends/opensl.c
+				   ${VIRY3D_LIB_SRC_DIR}/openal/Alc/alcThread.c
+                   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/android/ExternalStreamManagerAndroid.cpp
+                   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/android/ExternalTextureManagerAndroid.cpp
+                   ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/linux/Condition.cpp
+                   ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/src/linux/Mutex.cpp
+                   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/android/VirtualMachineEnv.cpp
+                   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/PlatformEGL.cpp
+				   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/vulkan/PlatformVkAndroid.cpp
+				   ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluevk/src/BlueVKLinuxAndroid.cpp
                    )
 
     target_include_directories(Viry3DDep PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}/openal/android
                                )
-
-    target_sources(Viry3D PRIVATE
-                   ${VIRY3D_LIB_SRC_DIR}/vulkan/vulkan_wrapper/vulkan_wrapper.cpp
-                   )
 
     target_include_directories(Viry3D PRIVATE
                                ${ANDROID_NDK}/sources/third_party/shaderc/include
@@ -914,7 +1005,6 @@ elseif (${Target} MATCHES "Android")
 
     add_library(Viry3DApp SHARED
                 ${VIRY3D_APP_SRCS}
-                ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c
                 ${CMAKE_SOURCE_DIR}/app/project/android/app/src/main/jni/jni.cpp
                 )
 
@@ -922,7 +1012,6 @@ elseif (${Target} MATCHES "Android")
                                ${VIRY3D_LIB_SRC_DIR}
                                ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
                                ${VIRY3D_APP_SRC_DIR}
-                               ${ANDROID_NDK}/sources/android/native_app_glue
                                )
 
     target_link_libraries(Viry3DApp
@@ -937,15 +1026,31 @@ elseif (${Target} MATCHES "Android")
 
 elseif (${Target} MATCHES "Mac")
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -DVR_MAC -DVR_VULKAN=1 -DVR_GLES=0")
-    add_definitions(-Wall -DHAVE_ASSERT_H -fobjc-arc)
+        "${CMAKE_CXX_FLAGS} -std=c++14 -DVR_MAC -DVR_VULKAN=0 -DVR_GLES=1 -DVR_METAL=1 -DVR_USE_METAL=1")
+    add_definitions(-Wall -DHAVE_ASSERT_H -fobjc-arc -DFILAMENT_SUPPORTS_METAL)
+
+    file(GLOB VIRY3D_DEP_SRCS_MAC
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/PlatformCocoaGL.mm
+		 ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGL.cpp
+         ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGLDarwin.cpp
+         ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGLCoreDarwinImpl.S
+         )
+
+    enable_language(ASM_MASM)
+    set_property(SOURCE ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGLCoreDarwinImpl.S PROPERTY LANGUAGE ASM_MASM)
+    set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/src/BlueGLCoreDarwinImpl.S PROPERTIES XCODE_EXPLICIT_FILE_TYPE "sourcecode.asm")
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_MAC})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_MAC})
 
     set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/Debug.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
-    set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/Application.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
+    set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/Engine.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
 
     target_include_directories(Viry3D PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/include
                                ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKGLSLToSPIRVConverter/macOS/MoltenVKGLSLToSPIRVConverter.framework/Headers
+                               ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKSPIRVToMSLConverter/macOS/MoltenVKSPIRVToMSLConverter.framework/Headers
                                )
 
     set_source_files_properties(${VIRY3D_APP_SRC_DIR}/../project/mac/app/Assets.xcassets
@@ -959,7 +1064,6 @@ elseif (${Target} MATCHES "Mac")
                    ${VIRY3D_APP_SRC_DIR}/../project/mac/Main.m
                    ${VIRY3D_APP_SRC_DIR}/../project/mac/AppDelegate.m
                    ${VIRY3D_APP_SRC_DIR}/../project/mac/ViewController.mm
-                   ${VIRY3D_APP_SRC_DIR}/../project/mac/VkView.m
                    ${VIRY3D_APP_SRC_DIR}/../project/mac/app/Assets.xcassets
                    ${VIRY3D_APP_SRC_DIR}/../bin/Assets
                    )
@@ -975,6 +1079,7 @@ elseif (${Target} MATCHES "Mac")
                           Viry3D Viry3DDep
                           ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/macOS/libMoltenVK.a
                           ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKGLSLToSPIRVConverter/macOS/MoltenVKGLSLToSPIRVConverter.framework
+                          ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKSPIRVToMSLConverter/macOS/MoltenVKSPIRVToMSLConverter.framework
                           "-framework OpenAL"
                           "-framework AppKit"
                           "-framework Metal"
@@ -1001,12 +1106,19 @@ elseif (${Target} MATCHES "iOS")
     set(CMAKE_OSX_ARCHITECTURES arm64)
 
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -DVR_IOS")
-    add_definitions(-Wall -DVR_VULKAN=1 -DVR_GLES=0 -DHAVE_ASSERT_H -fobjc-arc)
+        "${CMAKE_CXX_FLAGS} -std=c++14 -DVR_IOS -DVR_VULKAN=0 -DVR_GLES=1 -DVR_METAL=1 -DVR_USE_METAL=1")
+    add_definitions(-Wall -DIOS -DHAVE_ASSERT_H -fobjc-arc -DFILAMENT_SUPPORTS_METAL)
+
+    file(GLOB VIRY3D_DEP_SRCS_IOS
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/PlatformCocoaTouchGL.mm
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_IOS})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_IOS})
 
     set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/Debug.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
-    set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/Application.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
-    set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/ios/ARScene.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+    set_source_files_properties(${VIRY3D_LIB_SRC_DIR}/Engine.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
 
     file(GLOB VIRY3D_LIB_SRCS_IOS
          ${VIRY3D_LIB_SRC_DIR}/ios/*.h
@@ -1020,6 +1132,7 @@ elseif (${Target} MATCHES "iOS")
     target_include_directories(Viry3D PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/include
                                ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKGLSLToSPIRVConverter/iOS/MoltenVKGLSLToSPIRVConverter.framework/Headers
+                               ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKSPIRVToMSLConverter/iOS/MoltenVKSPIRVToMSLConverter.framework/Headers
                                )
 
     set_source_files_properties(${VIRY3D_APP_SRC_DIR}/../project/ios/app/Assets.xcassets
@@ -1034,7 +1147,6 @@ elseif (${Target} MATCHES "iOS")
                    ${VIRY3D_APP_SRC_DIR}/../project/ios/Main.m
                    ${VIRY3D_APP_SRC_DIR}/../project/ios/AppDelegate.m
                    ${VIRY3D_APP_SRC_DIR}/../project/ios/ViewController.mm
-                   ${VIRY3D_APP_SRC_DIR}/../project/ios/VkView.m
                    ${VIRY3D_APP_SRC_DIR}/../project/ios/app/Assets.xcassets
                    ${VIRY3D_APP_SRC_DIR}/../project/ios/app/Base.lproj/LaunchScreen.storyboard
                    ${VIRY3D_APP_SRC_DIR}/../bin/Assets
@@ -1051,9 +1163,11 @@ elseif (${Target} MATCHES "iOS")
                           Viry3D Viry3DDep
                           ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/iOS/libMoltenVK.a
                           ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKGLSLToSPIRVConverter/iOS/MoltenVKGLSLToSPIRVConverter.framework
+                          ${VIRY3D_LIB_SRC_DIR}/vulkan/MoltenVK/MoltenVKShaderConverter/MoltenVKSPIRVToMSLConverter/iOS/MoltenVKSPIRVToMSLConverter.framework
                           "-framework OpenAL"
                           "-framework UIKit"
                           "-framework Metal"
+                          "-framework OpenGLES"
                           "-framework QuartzCore"
                           "-framework IOKit"
                           "-framework ARKit"
@@ -1070,8 +1184,12 @@ elseif (${Target} MATCHES "iOS")
 elseif (${Target} MATCHES "WASM")
 
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -DVR_WASM -DVR_VULKAN=0 -DVR_GLES=1 -std=c++11")
+        "${CMAKE_CXX_FLAGS} -std=c++14 -DVR_WASM -DVR_VULKAN=0 -DVR_GLES=1")
     add_definitions(-Wall -s WASM=1 -O3)
+
+	target_sources(Viry3DDep PRIVATE
+                   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/PlatformWebGL.cpp
+                   )
 
     target_include_directories(Viry3D PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}/zlib

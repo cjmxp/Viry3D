@@ -24,12 +24,14 @@ namespace Viry3D
     class Object
     {
     public:
-        Object() { }
+        Object() { static int s_id = 0; m_id = ++s_id; }
         virtual ~Object() { }
         const String& GetName() const { return m_name; }
         void SetName(const String& name) { m_name = name; }
+		int GetId() const { return m_id; }
 
     private:
         String m_name;
+		int m_id;
     };
 }

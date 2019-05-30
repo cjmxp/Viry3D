@@ -17,14 +17,14 @@
 
 #pragma once
 
-#include "Node.h"
+#include "Component.h"
 
 namespace Viry3D
 {
     class AudioClip;
     class AudioSourcePrivate;
 
-    class AudioSource: public Node
+    class AudioSource: public Component
     {
     public:
         enum class State
@@ -46,10 +46,10 @@ namespace Viry3D
         void Pause();
         void Stop();
         State GetState() const;
-        virtual void Update();
 
     protected:
-        virtual void OnMatrixDirty();
+        virtual void Update();
+        virtual void OnTransformDirty();
 
     private:
         AudioSourcePrivate* m_private;

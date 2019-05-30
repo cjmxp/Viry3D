@@ -16,12 +16,10 @@
 */
 
 #import "ViewController.h"
-#import "VkView.h"
-#include "graphics/Display.h"
-#include "container/List.h"
-#include "thread/ThreadPool.h"
-#include "App.h"
+#include "Engine.h"
 #include "Input.h"
+#include "container/List.h"
+#include <QuartzCore/QuartzCore.h>
 
 using namespace Viry3D;
 
@@ -40,10 +38,24 @@ struct MouseEvent
 
 static bool g_mouse_down = false;
 
+@interface FrameHandler : NSObject
+
+@property (weak, nonatomic) ViewController* vc;
+
+@end
+
+@implementation FrameHandler
+
+- (void)drawFrame {
+    [self.vc drawFrame];
+}
+
+@end
+
 @implementation ViewController {
+    Engine* m_engine;
     NSTimer* m_timer;
-    Display* m_display;
-    App* m_app;
+    FrameHandler* m_frame_handler;
     int m_target_width;
     int m_target_height;
 }
@@ -54,68 +66,68 @@ static bool g_mouse_down = false;
     int window_width = size.width * scale;
     int window_height = size.height * scale;
     
-#if VR_VULKAN
-    View* view = [[View alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height)];
-    view.contentsScale = scale;
-    view.wantsLayer = YES;
-#elif VR_GLES
-    NSOpenGLPixelFormatAttribute attribs[] = {
-        NSOpenGLPFADoubleBuffer,
-        NSOpenGLPFAColorSize, 24,
-        NSOpenGLPFADepthSize, 24,
-        NSOpenGLPFAAccelerated,
-        NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersionLegacy, // mac gl 3.2 or 4.1 not support glsl 120
-        0
-    };
-    NSOpenGLPixelFormat* format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attribs];
-    NSOpenGLView* view = [[NSOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height) pixelFormat:format];
-    view.wantsBestResolutionOpenGLSurface = YES;
-
-    // this call will create context
-    [view openGLContext];
-#endif
-    
+    NSView* view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height)];
     self.view = view;
     
-    String name = "viry3d-vk-demo";
-    m_display = new Display(name, (__bridge void*) self.view, window_width, window_height);
+    void* window = nullptr;
+#if VR_USE_METAL
+    [view setWantsLayer:YES];
+    CAMetalLayer* layer = [CAMetalLayer layer];
+    layer.bounds = view.bounds;
+    layer.drawableSize = CGSizeMake(window_width, window_height);
+    layer.opaque = YES;
+    [view setLayer:layer];
+    window = (__bridge void*) layer;
+#else
+    view.wantsBestResolutionOpenGLSurface = YES;
+    window = (__bridge void*) view;
+#endif
     
-    m_app = new App();
-    m_app->SetName(name);
-    m_app->Init();
-    
-    m_timer = [NSTimer timerWithTimeInterval:1.0f / 60 target:self selector:@selector(drawFrame) userInfo:nil repeats:YES];
+    m_engine = Engine::Create(window, window_width, window_height);
+
+    m_frame_handler = [FrameHandler new];
+    m_frame_handler.vc = self;
+    m_timer = [NSTimer timerWithTimeInterval:1.0f / 60 target:m_frame_handler selector:@selector(drawFrame) userInfo:nil repeats:YES];
     [[NSRunLoop currentRunLoop] addTimer:m_timer forMode:NSDefaultRunLoopMode];
     
     m_target_width = window_width;
     m_target_height = window_height;
 }
 
-- (void)viewWillDisappear {
-    [super viewWillDisappear];
-    
-    [m_timer invalidate];
-}
-
 - (void)dealloc {
-    delete m_app;
-    delete m_display;
+    Engine::Destroy(&m_engine);
+    
+#ifndef NDEBUG
+    int alloc_size = Memory::GetAllocSize();
+    int new_size = Memory::GetNewSize();
+    assert(alloc_size == 0);
+    assert(new_size == 0);
+#endif
 }
 
 - (void)onResize:(int)width :(int)height {
     m_target_width = width;
     m_target_height = height;
+    
+#if VR_USE_METAL
+    CAMetalLayer* layer = (CAMetalLayer*) self.view.layer;
+    layer.drawableSize = CGSizeMake(m_target_width, m_target_height);
+#endif
 }
 
 - (void)drawFrame {
-    if (m_target_width != m_display->GetWidth() || m_target_height != m_display->GetHeight()) {
-        m_display->OnResize(m_target_width, m_target_height);
+    if (m_target_width != m_engine->GetWidth() || m_target_height != m_engine->GetHeight()) {
+        void* window = nullptr;
+#if VR_USE_METAL
+        window = (__bridge void*) self.view.layer;
+#else
+        window = (__bridge void*) self.view;
+#endif
+        
+        m_engine->OnResize(window, m_target_width, m_target_height);
     }
     
-    m_app->OnFrameBegin();
-    m_app->Update();
-    m_display->OnDraw();
-    m_app->OnFrameEnd();
+    m_engine->Execute();
 }
 
 - (void)onMouseDown:(const MouseEvent*)e {

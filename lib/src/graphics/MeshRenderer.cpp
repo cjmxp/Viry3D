@@ -16,8 +16,6 @@
 */
 
 #include "MeshRenderer.h"
-#include "Mesh.h"
-#include "BufferObject.h"
 
 namespace Viry3D
 {
@@ -25,136 +23,26 @@ namespace Viry3D
     {
 
     }
-
+    
     MeshRenderer::~MeshRenderer()
     {
-#if VR_VULKAN
-        if (m_draw_buffer)
-        {
-            m_draw_buffer->Destroy(Display::Instance()->GetDevice());
-            m_draw_buffer.reset();
-        }
-#endif
+
     }
-
-    Ref<BufferObject> MeshRenderer::GetVertexBuffer() const
-    {
-        Ref<BufferObject> buffer;
-
-        if (m_mesh)
-        {
-            buffer = m_mesh->GetVertexBuffer();
-        }
-
-        return buffer;
-    }
-
-    Ref<BufferObject> MeshRenderer::GetIndexBuffer() const
-    {
-        Ref<BufferObject> buffer;
-
-        if (m_mesh)
-        {
-            buffer = m_mesh->GetIndexBuffer();
-        }
-
-        return buffer;
-    }
-
-    IndexType MeshRenderer::GetIndexType() const
-    {
-        if (m_mesh)
-        {
-            return m_mesh->GetIndexType();
-        }
-
-        return IndexType::Uint16;
-    }
-
+    
     void MeshRenderer::SetMesh(const Ref<Mesh>& mesh)
     {
         m_mesh = mesh;
-        m_draw_buffer_dirty = true;
     }
-
-    void MeshRenderer::UpdateDrawBuffer()
+    
+    Vector<filament::backend::RenderPrimitiveHandle> MeshRenderer::GetPrimitives()
     {
-#if VR_VULKAN
-        const auto& materials = this->GetMaterials();
-        if (materials.Size() == 0 || !m_mesh)
+        Vector<filament::backend::RenderPrimitiveHandle> primitives;
+        
+        if (m_mesh)
         {
-            if (m_draw_buffer)
-            {
-                m_draw_buffer->Destroy(Display::Instance()->GetDevice());
-                m_draw_buffer.reset();
-
-                this->MarkInstanceCmdDirty();
-            }
-            return;
+            primitives = m_mesh->GetPrimitives();
         }
-
-        Vector<VkDrawIndexedIndirectCommand> draws(materials.Size());
-        int submesh_count = m_mesh->GetSubmeshCount();
-
-        for (int i = 0; i < materials.Size(); ++i)
-        {
-            auto& draw = draws[i];
-            if (i < submesh_count)
-            {
-                draw.indexCount = m_mesh->GetSubmesh(i).index_count;
-                draw.firstIndex = m_mesh->GetSubmesh(i).index_first;
-            }
-            else
-            {
-                draw.indexCount = 0;
-                draw.firstIndex = 0;
-            }
-            draw.instanceCount = this->GetInstanceCount();
-            draw.vertexOffset = 0;
-            draw.firstInstance = 0;
-        }
-
-        if (!m_draw_buffer || m_draw_buffer->GetSize() < draws.SizeInBytes())
-        {
-            if (m_draw_buffer)
-            {
-                m_draw_buffer->Destroy(Display::Instance()->GetDevice());
-                m_draw_buffer.reset();
-            }
-
-            m_draw_buffer = Display::Instance()->CreateBuffer(draws.Bytes(), draws.SizeInBytes(), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, true, VK_FORMAT_UNDEFINED);
-            
-            this->MarkInstanceCmdDirty();
-        }
-        else
-        {
-            Display::Instance()->UpdateBuffer(m_draw_buffer, 0, draws.Bytes(), draws.SizeInBytes());
-        }
-#elif VR_GLES
-        const auto& materials = this->GetMaterials();
-        if (materials.Size() == 0 || !m_mesh)
-        {
-            m_draw_buffers.Clear();
-            return;
-        }
-
-        m_draw_buffers.Resize(materials.Size());
-        int submesh_count = m_mesh->GetSubmeshCount();
-
-        for (int i = 0; i < materials.Size(); ++i)
-        {
-            auto& draw = m_draw_buffers[i];
-            if (i < submesh_count)
-            {
-                draw.index_count = m_mesh->GetSubmesh(i).index_count;
-                draw.first_index = m_mesh->GetSubmesh(i).index_first;
-            }
-            else
-            {
-                draw.index_count = 0;
-                draw.first_index = 0;
-            }
-        }
-#endif
+        
+        return primitives;
     }
 }

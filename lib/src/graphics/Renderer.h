@@ -17,105 +17,43 @@
 
 #pragma once
 
-#include "Node.h"
-#include "Display.h"
-#include "memory/Ref.h"
+#include "Component.h"
+#include "Material.h"
 #include "container/List.h"
-#include "math/Matrix4x4.h"
-#include "string/String.h"
+#include "container/Vector.h"
+#include "math/Vector4.h"
+#include "private/backend/DriverApi.h"
 
 namespace Viry3D
 {
-    class Material;
-    class Camera;
-    class BufferObject;
-
-#if VR_GLES
-    struct DrawBuffer
-    {
-        int first_index;
-        int index_count;
-    };
-#endif
-
-    struct RendererInstanceTransform
-    {
-        Vector3 position;
-        Quaternion rotation;
-        Vector3 scale;
-        Vector<Vector4> verctors;
-    };
-
-    class Renderer : public Node
+    class Renderer : public Component
     {
     public:
+        static const List<Renderer*>& GetRenderers() { return m_renderers; }
         Renderer();
         virtual ~Renderer();
-        virtual Ref<BufferObject> GetVertexBuffer() const { return Ref<BufferObject>(); }
-        virtual Ref<BufferObject> GetIndexBuffer() const { return Ref<BufferObject>(); }
-        virtual IndexType GetIndexType() const { return IndexType::Uint16; }
-#if VR_VULKAN
-        Ref<BufferObject> GetDrawBuffer() const { return m_draw_buffer; }
-#elif VR_GLES
-        const Vector<DrawBuffer>& GetDrawBuffers() const { return m_draw_buffers; }
-#endif
-        Ref<BufferObject> GetInstanceBuffer() const { return m_instance_buffer; }
-        virtual void Update();
-        virtual void OnFrameEnd() { }
-        virtual void OnResize(int width, int height) { }
         Ref<Material> GetMaterial() const;
-        const Vector<Ref<Material>>& GetMaterials() const { return m_materials; }
-        const Vector<Ref<Material>>& GetInstanceMaterials() const { return m_instance_materials; }
         void SetMaterial(const Ref<Material>& material);
+        const Vector<Ref<Material>>& GetMaterials() const { return m_materials; }
         void SetMaterials(const Vector<Ref<Material>>& materials);
         int GetLightmapIndex() const { return m_lightmap_index; }
         void SetLightmapIndex(int index);
+        const Vector4& GetLightmapScaleOffset() const { return m_lightmap_scale_offset; }
         void SetLightmapScaleOffset(const Vector4& vec);
-        void OnAddToCamera(Camera* camera);
-        void OnRemoveFromCamera(Camera* camera);
-        Camera* GetCamera() const { return m_camera; }
-        void MarkRendererOrderDirty();
-#if VR_VULKAN
-        void MarkInstanceCmdDirty();
-#elif VR_GLES
-        void OnDraw();
-#endif
-        void AddInstance(const Vector3& pos, const Quaternion& rot, const Vector3& scale);
-        void SetInstanceTransform(int instance_index, const Vector3& pos, const Quaternion& rot, const Vector3& scale);
-        void SetInstanceExtraVector(int instance_index, int vector_index, const Vector4& v);
-        int GetInstanceCount() const;
-        int GetInstanceStride() const;
+        const filament::backend::UniformBufferHandle& GetTransformUniformBuffer() const { return m_transform_uniform_buffer; }
+        virtual Vector<filament::backend::RenderPrimitiveHandle> GetPrimitives();
 
-    protected:
-        virtual void OnMatrixDirty();
-        virtual void UpdateDrawBuffer() { }
-        void SetInstanceMatrix(const String& name, const Matrix4x4& value);
-        void SetInstanceVectorArray(const String& name, const Vector<Vector4>& value);
-        void SetInstanceVector(const String& name, const Vector4& value);
-        void SetInstanceInt(const String& name, int value);
+	protected:
+		virtual void PrepareRender();
 
-    private:
-        void UpdateInstanceBuffer();
+	private:
+		friend class Camera;
 
-    protected:
-#if VR_VULKAN
-        Ref<BufferObject> m_draw_buffer;
-#elif VR_GLES
-        Vector<DrawBuffer> m_draw_buffers;
-#endif
-        bool m_draw_buffer_dirty;
-
-    private:
+	private:
+        static List<Renderer*> m_renderers;
         Vector<Ref<Material>> m_materials;
-        Vector<Ref<Material>> m_instance_materials;
-        Camera* m_camera;
-        bool m_model_matrix_dirty;
-        Vector<RendererInstanceTransform> m_instances;
-        Ref<BufferObject> m_instance_buffer;
-        bool m_instance_buffer_dirty;
-        int m_instance_extra_vector_count;
         Vector4 m_lightmap_scale_offset;
         int m_lightmap_index;
-        bool m_lightmap_uv_dirty;
+		filament::backend::UniformBufferHandle m_transform_uniform_buffer;
     };
 }

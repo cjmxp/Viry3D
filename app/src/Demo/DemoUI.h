@@ -34,6 +34,8 @@ namespace Viry3D
 
         void InitCanvas()
         {
+            m_camera->SetClearColor(Color(0.2f, 0.2f, 0.2f, 1));
+
             auto canvas = RefMake<CanvasRenderer>(FilterMode::Nearest);
             m_ui_camera->AddRenderer(canvas);
 
@@ -41,29 +43,19 @@ namespace Viry3D
             group->SetSize(Vector2i(VIEW_SIZE_FILL_PARENT, VIEW_SIZE_FILL_PARENT));
             canvas->AddView(group);
 
-            String text = UR"(国风·卫风·淇奥
-瞻彼淇奥，绿竹猗猗。有匪君子，如切如磋，如琢如磨。
-瑟兮僩兮，赫兮咺兮。有匪君子，终不可谖兮。
-瞻彼淇奥，绿竹青青。有匪君子，充耳璓莹，会弁如星。
-瑟兮僩兮，赫兮咺兮。有匪君子，终不可谖兮。
-瞻彼淇奥，绿竹如箦。有匪君子，如金如锡，如圭如璧。
-宽兮绰兮，猗重较兮。善戏谑兮，不为虐兮。
-
-Vulkan is a new generation graphics and compute API that provides high-efficiency, 
-cross-platform access to modern GPUs used in a wide variety of devices from PCs
-and consoles to mobile phones and embedded platforms. )";
+            String text = UR"(Vulkan is a new generation graphics and compute API that provides high-efficiency, cross-platform access to modern GPUs used in a wide variety of devices from PCs and consoles to mobile phones and embedded platforms. )";
             auto label = RefMake<Label>();
             group->AddSubview(label);
 
             label->SetAlignment(ViewAlignment::Left | ViewAlignment::Top);
             label->SetPivot(Vector2(0, 0));
-            label->SetSize(Vector2i(400, 400));
+            label->SetSize(Vector2i(250, 250));
             label->SetOffset(Vector2i(40, 100));
-            label->EnableClipRect(true);
             label->SetFont(Font::GetFont(FontType::PingFangSC));
             label->SetFontSize(26);
             label->SetTextAlignment(ViewAlignment::Left | ViewAlignment::Top);
             label->SetText(text);
+            label->SetWrapContent(true);
 
             auto texture = Texture::LoadTexture2DFromFile(Application::Instance()->GetDataPath() + "/texture/ui/button.png", FilterMode::Linear, SamplerAddressMode::ClampToEdge, false, false);
 
@@ -102,7 +94,7 @@ and consoles to mobile phones and embedded platforms. )";
                 group->AddSubview(button);
             }
 
-            auto atlas = SpriteAtlas::LoadFromFile(Application::Instance()->GetDataPath() + "/res/SunnyLand/tileset-sliced.json");
+            auto atlas = SpriteAtlas::LoadFromFile(Application::Instance()->GetDataPath() + "/res/SunnyLand/tileset-sliced.atlas");
 
             auto sprite = RefMake<Sprite>();
             sprite->SetSize(Vector2i(256, 256));
@@ -120,7 +112,7 @@ and consoles to mobile phones and embedded platforms. )";
             m_sprite = sprite.get();
 
             auto input = RefMake<InputField>();
-            input->SetSize(Vector2i(500, 80));
+            input->SetSize(Vector2i(300, 40));
             input->SetOffset(Vector2i(0, 270));
 
             group->AddSubview(input);

@@ -18,50 +18,82 @@
 #pragma once
 
 #include "Object.h"
-#include "Display.h"
-#include "VertexAttribute.h"
+#include "Color.h"
 #include "container/Vector.h"
+#include "math/Vector2.h"
 #include "math/Matrix4x4.h"
+#include "private/backend/DriverApi.h"
 
 namespace Viry3D
 {
-    class BufferObject;
-
     class Mesh : public Object
     {
     public:
+        struct Vertex
+        {
+            Vector3 vertex;
+            Color color;
+            Vector2 uv;
+            Vector2 uv2;
+            Vector3 normal;
+            Vector4 tangent;
+            Vector4 bone_weights;
+            Vector4 bone_indices;
+        };
+        
         struct Submesh
         {
             int index_first;
             int index_count;
         };
+        
+        struct BlendShapeFrame
+        {
+            float weight;
+            Vector<Vector3> vertices;
+            Vector<Vector3> normals;
+            Vector<Vector3> tangents;
+        };
+        
+        struct BlendShape
+        {
+            String name;
+            Vector<BlendShapeFrame> frames;
+        };
 
     public:
         static Ref<Mesh> LoadFromFile(const String& path);
-        Mesh(const Vector<Vertex>& vertices, const Vector<unsigned short>& indices, const Vector<Submesh>& submeshes = Vector<Submesh>(), bool dynamic = false);
-        Mesh(const Vector<Vertex>& vertices, const Vector<unsigned int>& indices, const Vector<Submesh>& submeshes = Vector<Submesh>(), bool dynamic = false);
+        Mesh(Vector<Vertex>&& vertices, Vector<unsigned int>&& indices, const Vector<Submesh>& submeshes = Vector<Submesh>(), bool uint32_index = false, bool dynamic = false);
         virtual ~Mesh();
-        void Update(const Vector<Vertex>& vertices, const Vector<unsigned short>& indices, const Vector<Submesh>& submeshes = Vector<Submesh>());
-        void Update(const Vector<Vertex>& vertices, const Vector<unsigned int>& indices, const Vector<Submesh>& submeshes = Vector<Submesh>());
-        const Ref<BufferObject>& GetVertexBuffer() const { return m_vertex_buffer; }
-        const Ref<BufferObject>& GetIndexBuffer() const { return m_index_buffer; }
-        int GetVertexCount() const { return m_vertex_count; }
-        int GetIndexCount() const { return m_index_count; }
-        int GetSubmeshCount() const { return m_submeshes.Size(); }
-        const Submesh& GetSubmesh(int submesh) const { return m_submeshes[submesh]; }
-        void SetBindposes(const Vector<Matrix4x4>& bindposes) { m_bindposes = bindposes; }
+        void Update(Vector<Vertex>&& vertices, Vector<unsigned int>&& indices, const Vector<Submesh>& submeshes = Vector<Submesh>());
+        const Vector<Vertex>& GetVertices() const { return m_vertices; }
+        const Vector<unsigned int>& GetIndices() const { return m_indices; }
+        const Vector<Submesh>& GetSubmeshes() const { return m_submeshes; }
         const Vector<Matrix4x4>& GetBindposes() const { return m_bindposes; }
-        IndexType GetIndexType() const { return m_index_type; }
+        const Vector<BlendShape>& GetBlendShapes() const { return m_blend_shapes; }
+		const filament::backend::AttributeArray& GetAttributes() const { return m_attributes; }
+		uint32_t GetEnabledAttributes() const { return m_enabled_attributes; }
+		const filament::backend::VertexBufferHandle& GetVertexBuffer() const { return m_vb; }
+		const filament::backend::IndexBufferHandle& GetIndexBuffer() const { return m_ib; }
+		const Vector<filament::backend::RenderPrimitiveHandle>& GetPrimitives() const { return m_primitives; }
 
     private:
-        Ref<BufferObject> m_vertex_buffer;
-        Ref<BufferObject> m_index_buffer;
-        IndexType m_index_type;
-        int m_vertex_count;
-        int m_index_count;
+        void SetBindposes(Vector<Matrix4x4>&& bindposes) { m_bindposes = std::move(bindposes); }
+        void SetBlendShapes(Vector<BlendShape>&& blend_shapes) { m_blend_shapes = std::move(blend_shapes); }
+        
+    private:
+        Vector<Vertex> m_vertices;
+        Vector<unsigned int> m_indices;
         int m_buffer_vertex_count;
         int m_buffer_index_count;
         Vector<Submesh> m_submeshes;
         Vector<Matrix4x4> m_bindposes;
+        Vector<BlendShape> m_blend_shapes;
+        bool m_uint32_index;
+		filament::backend::AttributeArray m_attributes;
+		uint32_t m_enabled_attributes;
+        filament::backend::VertexBufferHandle m_vb;
+        filament::backend::IndexBufferHandle m_ib;
+        Vector<filament::backend::RenderPrimitiveHandle> m_primitives;
     };
 }
