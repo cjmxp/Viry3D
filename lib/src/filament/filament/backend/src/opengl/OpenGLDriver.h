@@ -288,6 +288,9 @@ private:
 
     /* Misc... */
 
+	void framebufferTexture(backend::TargetBufferInfo const& binfo,
+		GLenum target, GLenum attachment) noexcept;
+
     void framebufferTexture(backend::TargetBufferInfo const& binfo,
             GLRenderTarget const* rt, GLenum attachment) noexcept;
 
@@ -302,16 +305,16 @@ private:
     }
 
     void setTextureData(GLTexture* t,
-            uint32_t level,
-            uint32_t xoffset, uint32_t yoffset, uint32_t zoffset,
-            uint32_t width, uint32_t height, uint32_t depth,
-            backend::PixelBufferDescriptor&& data, backend::FaceOffsets const* faceOffsets);
+			uint32_t layer, uint32_t level,
+            uint32_t x, uint32_t y,
+            uint32_t w, uint32_t h,
+            const backend::PixelBufferDescriptor& data);
 
     void setCompressedTextureData(GLTexture* t,
-            uint32_t level,
-            uint32_t xoffset, uint32_t yoffset, uint32_t zoffset,
-            uint32_t width, uint32_t height, uint32_t depth,
-            backend::PixelBufferDescriptor&& data, backend::FaceOffsets const* faceOffsets);
+			uint32_t layer, uint32_t level,
+            uint32_t x, uint32_t y,
+            uint32_t w, uint32_t h,
+			const backend::PixelBufferDescriptor& data);
 
     void renderBufferStorage(GLuint rbo, GLenum internalformat, uint32_t width,
             uint32_t height, uint8_t samples) const noexcept;
@@ -577,6 +580,9 @@ private:
     void updateStream(GLTexture* t, backend::DriverApi* driver) noexcept;
     void updateBuffer(GLenum target, GLBuffer* buffer, backend::BufferDescriptor const& p, uint32_t alignment = 16) noexcept;
     void updateTextureLodRange(GLTexture* texture, int8_t targetLevel) noexcept;
+
+	GLuint mSharedDrawFramebuffer = 0;
+	GLuint mSharedReadFramebuffer = 0;
 };
 
 // ------------------------------------------------------------------------------------------------

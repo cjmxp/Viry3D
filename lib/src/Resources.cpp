@@ -160,6 +160,10 @@ namespace Viry3D
                 material = RefMake<Material>(shader);
                 material->SetName(material_name);
             }
+			else
+			{
+				assert(shader);
+			}
             
             int property_count = ms.Read<int>();
             for (int i = 0; i < property_count; ++i)
@@ -171,7 +175,9 @@ namespace Viry3D
                 {
                     case MaterialProperty::Type::Color:
                     {
-                        Color value = ms.Read<Color>();
+						byte c[4];
+                        ms.Read(c, sizeof(c));
+						Color value(c[0] / 255.0f, c[1] / 255.0f, c[2] / 255.0f, c[3] / 255.0f);
                         if (material)
                         {
                             material->SetColor(property_name, value);

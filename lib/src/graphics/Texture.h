@@ -19,11 +19,13 @@
 
 #include "Object.h"
 #include "private/backend/DriverApi.h"
+#include <functional>
 
 namespace Viry3D
 {
     class ByteBuffer;
-    
+	class Image;
+
     enum class CubemapFace
     {
         Unknown = -1,
@@ -83,6 +85,7 @@ namespace Viry3D
     public:
         static void Init();
         static void Done();
+		static const Ref<Image>& GetSharedWhiteImage();
         static const Ref<Texture>& GetSharedWhiteTexture();
         static const Ref<Texture>& GetSharedBlackTexture();
         static const Ref<Texture>& GetSharedNormalTexture();
@@ -122,8 +125,23 @@ namespace Viry3D
 		static TextureFormat SelectFormat(const Vector<TextureFormat>& formats, bool render_texture);
 		static TextureFormat SelectDepthFormat();
         virtual ~Texture();
-        void UpdateTexture2D(const ByteBuffer& pixels, int x, int y, int w, int h, int level);
-        void UpdateCubemap(const ByteBuffer& pixels, int level, const Vector<int>& face_offsets);
+		void UpdateCubemap(const ByteBuffer& pixels, int level, const Vector<int>& face_offsets);
+		void UpdateTexture(const ByteBuffer& pixels, int layer, int level, int x, int y, int w, int h);
+		void CopyTexture(
+			int dst_layer, int dst_level,
+			int dst_x, int dst_y,
+			int dst_w, int dst_h,
+			const Ref<Texture>& src,
+			int src_layer, int src_level,
+			int src_x, int src_y,
+			int src_w, int src_h,
+			FilterMode blit_filter);
+		void CopyToMemory(
+			ByteBuffer& pixels,
+			int layer, int level,
+			int x, int y,
+			int w, int h,
+			std::function<void(const ByteBuffer&)> on_complete);
         void GenMipmaps();
 		int GetWidth() const { return m_width; }
 		int GetHeight() const { return m_height; }
@@ -137,9 +155,10 @@ namespace Viry3D
 
     private:
         Texture();
-        void UpdateSampler();
+        void UpdateSampler(bool depth);
         
 	private:
+		static Ref<Image> m_shared_white_image;
         static Ref<Texture> m_shared_white_texture;
         static Ref<Texture> m_shared_black_texture;
         static Ref<Texture> m_shared_normal_texture;

@@ -48,7 +48,7 @@ namespace Viry3D
         State GetState() const;
 
     protected:
-        virtual void Update();
+		virtual void Update();
         virtual void OnTransformDirty();
 
     private:

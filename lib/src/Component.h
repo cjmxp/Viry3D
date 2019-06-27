@@ -36,7 +36,7 @@ namespace Viry3D
         virtual void Update() { }
         virtual void OnTransformDirty() { }
         
-    private:
+	private:
         friend class GameObject;
         
     private:

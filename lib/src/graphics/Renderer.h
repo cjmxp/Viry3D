@@ -30,12 +30,17 @@ namespace Viry3D
     {
     public:
         static const List<Renderer*>& GetRenderers() { return m_renderers; }
+		static void PrepareAll();
         Renderer();
         virtual ~Renderer();
         Ref<Material> GetMaterial() const;
         void SetMaterial(const Ref<Material>& material);
         const Vector<Ref<Material>>& GetMaterials() const { return m_materials; }
         void SetMaterials(const Vector<Ref<Material>>& materials);
+		bool IsCastShadow() const { return m_cast_shadow; }
+		void EnableCastShadow(bool enable);
+		bool IsRecieveShadow() const { return m_recieve_shadow; }
+		void EnableRecieveShadow(bool enable);
         int GetLightmapIndex() const { return m_lightmap_index; }
         void SetLightmapIndex(int index);
         const Vector4& GetLightmapScaleOffset() const { return m_lightmap_scale_offset; }
@@ -44,7 +49,8 @@ namespace Viry3D
         virtual Vector<filament::backend::RenderPrimitiveHandle> GetPrimitives();
 
 	protected:
-		virtual void PrepareRender();
+		virtual void Prepare();
+		virtual void OnResize(int width, int height) { }
 
 	private:
 		friend class Camera;
@@ -52,6 +58,8 @@ namespace Viry3D
 	private:
         static List<Renderer*> m_renderers;
         Vector<Ref<Material>> m_materials;
+		bool m_cast_shadow;
+		bool m_recieve_shadow;
         Vector4 m_lightmap_scale_offset;
         int m_lightmap_index;
 		filament::backend::UniformBufferHandle m_transform_uniform_buffer;

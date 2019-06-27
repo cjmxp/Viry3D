@@ -42,12 +42,6 @@ file(GLOB VIRY3D_DEP_SRCS
      ${VIRY3D_LIB_SRC_DIR}/crypto/md5/md5.c
 	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/noop/NoopDriver.cpp
 	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/noop/PlatformNoop.cpp
-	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/gl_headers.cpp
-	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/GLUtils.cpp
-	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLBlitter.cpp
-	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLDriver.cpp
-	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLPlatform.cpp
-	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLProgram.cpp
 	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/CircularBuffer.cpp
 	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/CommandBufferQueue.cpp
 	 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/CommandStream.cpp
@@ -186,7 +180,6 @@ target_include_directories(Viry3DDep PRIVATE
                            ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
 						   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/include
 						   ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src
-						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/include
 						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/math/include
 						   ${VIRY3D_LIB_SRC_DIR}/filament/libs/utils/include
                            )
@@ -208,12 +201,15 @@ file(GLOB VIRY3D_LIB_SRCS
      ${VIRY3D_LIB_SRC_DIR}/math/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/memory/*.h
      ${VIRY3D_LIB_SRC_DIR}/memory/*.cpp
+     ${VIRY3D_LIB_SRC_DIR}/physics/*.h
      ${VIRY3D_LIB_SRC_DIR}/string/*.h
      ${VIRY3D_LIB_SRC_DIR}/string/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/thread/*.h
      ${VIRY3D_LIB_SRC_DIR}/thread/*.cpp
      ${VIRY3D_LIB_SRC_DIR}/time/*.h
      ${VIRY3D_LIB_SRC_DIR}/time/*.cpp
+	 ${VIRY3D_LIB_SRC_DIR}/ui/*.h
+     ${VIRY3D_LIB_SRC_DIR}/ui/*.cpp
      )
 
 source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_LIB_SRCS})
@@ -238,6 +234,32 @@ file(GLOB VIRY3D_APP_SRCS
      )
 
 source_group(TREE ${VIRY3D_APP_SRC_DIR}/.. FILES ${VIRY3D_APP_SRCS})
+
+# filament opengl
+if ( ${Target} MATCHES "Windows" OR
+     ${Target} MATCHES "Android" OR
+	 ${Target} MATCHES "Mac" OR
+     ${Target} MATCHES "iOS" OR
+	 ${Target} MATCHES "WASM")
+
+    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_OPENGL
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/gl_headers.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/GLUtils.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLBlitter.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLDriver.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLPlatform.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/OpenGLProgram.cpp
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_OPENGL})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_OPENGL})
+
+    target_include_directories(Viry3DDep PRIVATE
+                               ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluegl/include
+                               )
+
+endif ()
 
 # filament vulkan
 if ( ${Target} MATCHES "Windows" OR
@@ -266,6 +288,45 @@ if ( ${Target} MATCHES "Windows" OR
                                ${VIRY3D_LIB_SRC_DIR}/filament/libs/bluevk/include
 							   ${VIRY3D_LIB_SRC_DIR}/filament/third_party/vkmemalloc/src
                                )
+
+endif ()
+
+# filament metal
+if ( ${Target} MATCHES "Mac" OR
+     ${Target} MATCHES "iOS" )
+
+    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_METAL
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalBlitter.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalBufferPool.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalContext.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalDriver.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalExternalImage.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalHandles.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalResourceTracker.cpp
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalState.mm
+         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/PlatformMetal.mm
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_METAL})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_METAL})
+
+endif ()
+
+# filament d3d
+if ( ${Target} MATCHES "Windows" OR
+     ${Target} MATCHES "UWP" )
+
+    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_D3D11
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Context.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Driver.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Handles.cpp
+		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/PlatformD3D11.cpp
+         )
+
+    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_D3D11})
+
+    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_D3D11})
 
 endif ()
 
@@ -356,45 +417,6 @@ if (${Target} MATCHES "Windows" OR ${Target} MATCHES "UWP")
     source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_SPIRV_CROSS})
 
     target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_SPIRV_CROSS})
-
-endif ()
-
-# filament metal
-if ( ${Target} MATCHES "Mac" OR
-     ${Target} MATCHES "iOS" )
-
-    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_METAL
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalBlitter.mm
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalBufferPool.mm
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalContext.mm
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalDriver.mm
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalExternalImage.mm
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalHandles.mm
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalResourceTracker.cpp
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/MetalState.mm
-         ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/metal/PlatformMetal.mm
-         )
-
-    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_METAL})
-
-    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_METAL})
-
-endif ()
-
-# filament d3d
-if ( ${Target} MATCHES "Windows" OR
-     ${Target} MATCHES "UWP" )
-
-    file(GLOB VIRY3D_DEP_SRCS_FILAMENT_D3D11
-		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Context.cpp
-		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Driver.cpp
-		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/D3D11Handles.cpp
-		 ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/d3d/PlatformD3D11.cpp
-         )
-
-    source_group(TREE ${VIRY3D_LIB_SRC_DIR}/.. FILES ${VIRY3D_DEP_SRCS_FILAMENT_D3D11})
-
-    target_sources(Viry3DDep PRIVATE ${VIRY3D_DEP_SRCS_FILAMENT_D3D11})
 
 endif ()
 
@@ -900,12 +922,10 @@ elseif (${Target} MATCHES "UWP")
 
     target_include_directories(Viry3DDep PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}/openal/win
-							   ${VIRY3D_LIB_SRC_DIR}/gles/angle/include
                                )
 
     target_include_directories(Viry3D PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}/zlib
-                               ${VIRY3D_LIB_SRC_DIR}/gles/angle/include
                                )
 
     set(UWP_ASSETS
@@ -921,8 +941,6 @@ elseif (${Target} MATCHES "UWP")
         ${VIRY3D_ASSETS}
         ${UWP_ASSETS}
         ${VIRY3D_APP_SRC_DIR}/../project/uwp/Package.appxmanifest
-        ${VIRY3D_LIB_SRC_DIR}/gles/angle/lib/${Arch}/libEGL.dll
-        ${VIRY3D_LIB_SRC_DIR}/gles/angle/lib/${Arch}/libGLESv2.dll
         )
     set(UWP_RESOURCE_FILES
         ${UWP_CONTENT}
@@ -951,14 +969,11 @@ elseif (${Target} MATCHES "UWP")
     target_include_directories(Viry3DApp PRIVATE
                                ${VIRY3D_LIB_SRC_DIR}
                                ${VIRY3D_LIB_SRC_DIR}/jsoncpp/include
-                               ${VIRY3D_LIB_SRC_DIR}/gles/angle/include
                                ${VIRY3D_APP_SRC_DIR}
                                )
 
     target_link_libraries(Viry3DApp
                           Viry3D Viry3DDep
-                          ${VIRY3D_LIB_SRC_DIR}/gles/angle/lib/${Arch}/libEGL.lib
-                          ${VIRY3D_LIB_SRC_DIR}/gles/angle/lib/${Arch}/libGLESv2.lib
                           mincore.lib
                           )
 
@@ -1027,7 +1042,7 @@ elseif (${Target} MATCHES "Android")
 elseif (${Target} MATCHES "Mac")
     set(CMAKE_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -std=c++14 -DVR_MAC -DVR_VULKAN=0 -DVR_GLES=1 -DVR_METAL=1 -DVR_USE_METAL=1")
-    add_definitions(-Wall -DHAVE_ASSERT_H -fobjc-arc -DFILAMENT_SUPPORTS_METAL)
+    add_definitions(-Wall -DHAVE_ASSERT_H -DFILAMENT_SUPPORTS_METAL)
 
     file(GLOB VIRY3D_DEP_SRCS_MAC
          ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/PlatformCocoaGL.mm
@@ -1107,7 +1122,7 @@ elseif (${Target} MATCHES "iOS")
 
     set(CMAKE_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -std=c++14 -DVR_IOS -DVR_VULKAN=0 -DVR_GLES=1 -DVR_METAL=1 -DVR_USE_METAL=1")
-    add_definitions(-Wall -DIOS -DHAVE_ASSERT_H -fobjc-arc -DFILAMENT_SUPPORTS_METAL)
+    add_definitions(-Wall -DIOS -DHAVE_ASSERT_H -DFILAMENT_SUPPORTS_METAL)
 
     file(GLOB VIRY3D_DEP_SRCS_IOS
          ${VIRY3D_LIB_SRC_DIR}/filament/filament/backend/src/opengl/PlatformCocoaTouchGL.mm

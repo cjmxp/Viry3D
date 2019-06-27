@@ -45,8 +45,8 @@ static constexpr uint64_t SWAP_CHAIN_CONFIG_READABLE = 0x2;
 static constexpr size_t MAX_VERTEX_ATTRIBUTE_COUNT = 8; // FIXME: what should this be?
 static constexpr size_t MAX_SAMPLER_COUNT = 16;         // Matches the Adreno Vulkan driver.
 
-static constexpr size_t CONFIG_UNIFORM_BINDING_COUNT = 6;
-static constexpr size_t CONFIG_SAMPLER_BINDING_COUNT = 6;
+static constexpr size_t CONFIG_UNIFORM_BINDING_COUNT = 7;
+static constexpr size_t CONFIG_SAMPLER_BINDING_COUNT = CONFIG_UNIFORM_BINDING_COUNT;
 
 /**
  * Selects which driver a particular Engine should use.
@@ -119,6 +119,12 @@ struct Viewport {
     uint32_t height;
     int32_t right() const noexcept { return left + width; }
     int32_t top() const noexcept { return bottom + height; }
+};
+
+struct Offset3D {
+	int32_t x;
+	int32_t y;
+	int32_t z;
 };
 
 struct RenderPassFlags {
@@ -681,10 +687,10 @@ struct PolygonOffset {
 };
 
 struct RasterState {
-    using CullingMode = CullingMode;
-    using DepthFunc = SamplerCompareFunc;
-    using BlendEquation = BlendEquation;
-    using BlendFunction = BlendFunction;
+    using CullingMode = filament::backend::CullingMode;
+    using DepthFunc = filament::backend::SamplerCompareFunc;
+    using BlendEquation = filament::backend::BlendEquation;
+    using BlendFunction = filament::backend::BlendFunction;
 
     RasterState() noexcept { // NOLINT(cppcoreguidelines-pro-type-member-init)
         static_assert(sizeof(RasterState) == sizeof(uint32_t),

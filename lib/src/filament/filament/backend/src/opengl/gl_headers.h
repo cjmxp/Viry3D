@@ -50,6 +50,8 @@
 
 #elif defined(IOS)
 
+    #define GLES_SILENCE_DEPRECATION
+
     #include <OpenGLES/ES3/gl.h>
     #include <OpenGLES/ES3/glext.h>
 
@@ -61,26 +63,6 @@
     #define GL_TEXTURE_2D_MULTISAMPLE         0x9100
 
     void glTexStorage2DMultisample (GLenum target, GLsizei samples, GLenum internalformat,
-            GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
-
-    namespace glext {
-        void glFramebufferTexture2DMultisampleEXT (GLenum target, GLenum attachment,
-                GLenum textarget, GLuint texture, GLint level, GLsizei samples);
-
-        void glRenderbufferStorageMultisampleEXT (GLenum target, GLsizei samples,
-                GLenum internalformat, GLsizei width, GLsizei height);
-    }
-
-#elif defined(VR_UWP)
-
-	#define GL_GLEXT_PROTOTYPES 1
-	#include <GLES3/gl3.h>
-	#include <GLES2/gl2ext.h>
-
-	#define GL_ES_VERSION_3_1 1
-	#define GL_TEXTURE_2D_MULTISAMPLE         0x9100
-
-	void glTexStorage2DMultisample (GLenum target, GLsizei samples, GLenum internalformat,
             GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
 
     namespace glext {

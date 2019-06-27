@@ -105,7 +105,7 @@ namespace Viry3D
 #endif
     }
 
-	Ref<Shader> Shader::Find(const String& name, const Vector<String>& keywords)
+	Ref<Shader> Shader::Find(const String& name, const Vector<String>& keywords, bool light_add)
 	{
 		Ref<Shader> shader;
 
@@ -134,7 +134,7 @@ namespace Viry3D
 			{
 				String lua_src = File::ReadAllText(path);
 
-				shader = RefMake<Shader>(name);
+				shader = Ref<Shader>(new Shader(name, light_add));
 				shader->Load(lua_src, keyword_list);
 				shader->Compile();
 
@@ -149,7 +149,8 @@ namespace Viry3D
 		return shader;
 	}
     
-    Shader::Shader(const String& name):
+    Shader::Shader(const String& name, bool light_add):
+		m_light_add(light_add),
 		m_queue(0)
     {
         this->SetName(name);
@@ -251,6 +252,9 @@ namespace Viry3D
 		SetGlobalInt(L, "Transparent", (int) Queue::Transparent);
 		SetGlobalInt(L, "Overlay", (int) Queue::Overlay);
 
+		SetGlobalInt(L, "None", (int) LightMode::None);
+		SetGlobalInt(L, "Forward", (int) LightMode::Forward);
+
 		String dir = Engine::Instance()->GetDataPath() + "/shader/" + this->GetName();
 		dir = dir.Substring(0, dir.LastIndexOf("/"));
 		AddLuaPath(L, dir + "/?.lua");
@@ -260,6 +264,7 @@ namespace Viry3D
 			String error = lua_tostring(L, -1);
 			lua_pop(L, 1);
 			Log("do lua error: %s\n", error.CString());
+			assert(false);
 		}
 
 		if (lua_istable(L, -1))
@@ -310,6 +315,17 @@ namespace Viry3D
 						if (m_queue < pass.queue)
 						{
 							m_queue = pass.queue;
+						}
+
+						GetTableInt(L, "LightMode", pass.light_mode);
+
+						if (pass.light_mode == LightMode::Forward && m_light_add)
+						{
+							pass.pipeline.rasterState.depthWrite = false;
+							pass.pipeline.rasterState.blendFunctionSrcRGB = src_blend;
+							pass.pipeline.rasterState.blendFunctionSrcAlpha = src_blend;
+							pass.pipeline.rasterState.blendFunctionDstRGB = filament::backend::BlendFunction::ONE;
+							pass.pipeline.rasterState.blendFunctionDstAlpha = filament::backend::BlendFunction::ONE;
 						}
 					}
 					lua_pop(L, 1);
@@ -370,11 +386,31 @@ namespace Viry3D
 						{
 							if (lua_istable(L, -1))
 							{
-								Sampler sampler;
-								GetTableString(L, "name", sampler.name);
-								GetTableInt(L, "binding", sampler.binding);
+								SamplerGroup group;
+								GetTableString(L, "name", group.name);
+								GetTableInt(L, "binding", group.binding);
 
-								pass.samplers.Add(sampler);
+								lua_pushstring(L, "samplers");
+								lua_gettable(L, -2);
+								if (lua_istable(L, -1))
+								{
+									lua_pushnil(L);
+									while (lua_next(L, -2))
+									{
+										if (lua_istable(L, -1))
+										{
+											Sampler sampler;
+											GetTableString(L, "name", sampler.name);
+											GetTableInt(L, "binding", sampler.binding);
+
+											group.samplers.Add(sampler);
+										}
+										lua_pop(L, 1);
+									}
+								}
+								lua_pop(L, 1);
+
+								pass.samplers.Add(group);
 							}
 							lua_pop(L, 1);
 						}
@@ -432,12 +468,17 @@ namespace Viry3D
 				vk_convert = "void vk_convert() { }\n";
 			}
 		}
-		else
+		else if (Engine::Instance()->GetBackend() == filament::backend::Backend::OPENGL)
 		{
-			define = "#define VK_LAYOUT_LOCATION(i)\n"
+			define = "#define VR_GLES 1\n"
+				"#define VK_LAYOUT_LOCATION(i)\n"
 				"#define VK_UNIFORM_BINDING(i) layout(std140)\n"
 				"#define VK_SAMPLER_BINDING(i)\n";
 			vk_convert = "void vk_convert() { }\n";
+		}
+		else
+		{
+			assert(false);
 		}
 
 		for (const auto& i : m_keywords)
@@ -582,15 +623,20 @@ namespace Viry3D
 				pb.setUniformBlock(pass.uniforms[i].binding, utils::CString(pass.uniforms[i].name.CString()));
 			}
 			
-			Vector<filament::backend::Program::Sampler> samplers;
 			for (int i = 0; i < pass.samplers.Size(); ++i)
 			{
-				filament::backend::Program::Sampler sampler;
-				sampler.name = utils::CString(pass.samplers[i].name.CString());
-				sampler.binding = pass.samplers[i].binding;
-				samplers.Add(sampler);
+				const auto& group = pass.samplers[i];
+
+				Vector<filament::backend::Program::Sampler> samplers;
+				for (int j = 0; j < group.samplers.Size(); ++j)
+				{
+					filament::backend::Program::Sampler sampler;
+					sampler.name = utils::CString(group.samplers[j].name.CString());
+					sampler.binding = group.samplers[j].binding;
+					samplers.Add(sampler);
+				}
+				pb.setSamplerGroup((size_t) group.binding, &samplers[0], samplers.Size());
 			}
-			pb.setSamplerGroup((size_t) Shader::BindingPoint::PerMaterialInstance, &samplers[0], samplers.Size());
 
 			pass.pipeline.program = driver.createProgram(std::move(pb));
 		}

@@ -427,23 +427,36 @@ namespace filament
 			this->scheduleDestroy(std::move(data));
 		}
 
-		void D3D11Driver::update2DImage(
+		void D3D11Driver::updateTexture(
 			Handle<HwTexture> th,
-			uint32_t level,
-			uint32_t x,
-			uint32_t y,
-			uint32_t width,
-			uint32_t height,
+			int layer, int level,
+			int x, int y,
+			int w, int h,
 			PixelBufferDescriptor&& data)
 		{
 			auto texture = handle_cast<D3D11Texture>(m_handle_map, th);
-			texture->Update2DImage(
+			texture->UpdateTexture(
 				m_context,
-				level,
-				x,
-				y,
-				width,
-				height,
+				layer, level,
+				x, y,
+				w, h,
+				data);
+			this->scheduleDestroy(std::move(data));
+		}
+
+		void D3D11Driver::update2DImage(
+			Handle<HwTexture> th,
+			uint32_t level,
+			uint32_t x, uint32_t y,
+			uint32_t width, uint32_t height,
+			PixelBufferDescriptor&& data)
+		{
+			auto texture = handle_cast<D3D11Texture>(m_handle_map, th);
+			texture->UpdateTexture(
+				m_context,
+				0, level,
+				x, y,
+				width, height,
 				data);
 			this->scheduleDestroy(std::move(data));
 		}
@@ -455,11 +468,69 @@ namespace filament
 			FaceOffsets face_offsets)
 		{
 			auto texture = handle_cast<D3D11Texture>(m_handle_map, th);
-			texture->UpdateCubeImage(
+			for (int i = 0; i < 6; ++i)
+			{
+				auto buffer = static_cast<uint8_t*>(data.buffer) + face_offsets[i];
+				if (data.type == PixelDataType::COMPRESSED)
+				{
+					texture->UpdateTexture(
+						m_context,
+						i, level,
+						0, 0,
+						texture->width >> level, texture->height >> level,
+						PixelBufferDescriptor(buffer, data.size / 6, data.compressedFormat, data.imageSize, nullptr));
+				}
+				else
+				{
+					texture->UpdateTexture(
+						m_context,
+						i, level,
+						0, 0,
+						texture->width >> level, texture->height >> level,
+						PixelBufferDescriptor(buffer, data.size / 6, data.format, data.type));
+				}
+			}
+			this->scheduleDestroy(std::move(data));
+		}
+
+		void D3D11Driver::copyTexture(
+			Handle<HwTexture> th_dst, int dst_layer, int dst_level,
+			Offset3D dst_offset,
+			Offset3D dst_extent,
+			Handle<HwTexture> th_src, int src_layer, int src_level,
+			Offset3D src_offset,
+			Offset3D src_extent,
+			SamplerMagFilter blit_filter)
+		{
+			auto dst = handle_cast<D3D11Texture>(m_handle_map, th_dst);
+			auto src = handle_cast<D3D11Texture>(m_handle_map, th_src);
+			dst->CopyTexture(
 				m_context,
-				level,
-				data,
-				face_offsets);
+				dst_layer, dst_level,
+				dst_offset, dst_extent,
+				src,
+				src_layer, src_level,
+				src_offset, src_extent);
+		}
+
+		void D3D11Driver::copyTextureToMemory(
+			Handle<HwTexture> th,
+			int layer, int level,
+			Offset3D offset,
+			Offset3D extent,
+			PixelBufferDescriptor&& data,
+			std::function<void(const PixelBufferDescriptor&)> on_complete)
+		{
+			auto texture = handle_cast<D3D11Texture>(m_handle_map, th);
+			texture->CopyTextureToMemory(
+				m_context,
+				layer, level,
+				offset, extent,
+				data);
+			if (on_complete)
+			{
+				on_complete(data);
+			}
 			this->scheduleDestroy(std::move(data));
 		}
 
@@ -547,7 +618,14 @@ namespace filament
 				target_height = render_target->height;
 			}
 
-			m_context->context->OMSetRenderTargets(1, &color, depth);
+			if (color)
+			{
+				m_context->context->OMSetRenderTargets(1, &color, depth);
+			}
+			else
+			{
+				m_context->context->OMSetRenderTargets(0, nullptr, depth);
+			}
 
 			// set viewport
 			D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(
@@ -590,6 +668,19 @@ namespace filament
 		{
 			m_context->current_render_target = nullptr;
 			m_context->current_render_pass_flags = { };
+
+			for (size_t i = 0; i < m_context->uniform_buffer_bindings.size(); ++i)
+			{
+				m_context->uniform_buffer_bindings[i] = { };
+			}
+
+			for (size_t i = 0; i < m_context->sampler_group_binding.size(); ++i)
+			{
+				m_context->sampler_group_binding[i].sampler_group = SamplerGroupHandle();
+			}
+
+			ID3D11ShaderResourceView* null_views[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { };
+			m_context->context->PSSetShaderResources(0, D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, null_views);
 		}
 
 		void D3D11Driver::discardSubRenderTargetBuffers(
@@ -756,6 +847,10 @@ namespace filament
 					{
 						m_context->context->VSSetConstantBuffers1((UINT) i, 1, &m_context->uniform_buffer_bindings[i].buffer, nullptr, nullptr);
 					}
+					else
+					{
+						m_context->context->VSSetConstantBuffers1((UINT) i, 0, nullptr, nullptr, nullptr);
+					}
 				}
 			}
 			
@@ -769,27 +864,32 @@ namespace filament
 					{
 						m_context->context->PSSetConstantBuffers1((UINT) i, 1, &m_context->uniform_buffer_bindings[i].buffer, nullptr, nullptr);
 					}
+					else
+					{
+						m_context->context->PSSetConstantBuffers1((UINT) i, 0, nullptr, nullptr, nullptr);
+					}
 				}
 
-				for (size_t i = 0; i < m_context->sampler_group_binding.size(); ++i)
+				const auto& samplers = program->info.getSamplerGroupInfo();
+				for (size_t i = 0; i < samplers.size(); ++i)
 				{
 					if (m_context->sampler_group_binding[i].sampler_group)
 					{
 						auto sampler_group = handle_cast<D3D11SamplerGroup>(m_handle_map, m_context->sampler_group_binding[i].sampler_group);
 
-						for (size_t j = 0; j < sampler_group->sb->getSize(); ++j)
+						for (int j = 0; j < samplers[i].size(); ++j)
 						{
 							auto& s = sampler_group->sb->getSamplers()[j];
-
+							
 							if (s.t)
 							{
 								auto texture = handle_const_cast<D3D11Texture>(m_handle_map, s.t);
 								if (texture->image_view)
 								{
-									m_context->context->PSSetShaderResources((UINT) j, 1, (ID3D11ShaderResourceView* const*) &texture->image_view);
-									
+									m_context->context->PSSetShaderResources((UINT) samplers[i][j].binding, 1, (ID3D11ShaderResourceView* const*) &texture->image_view);
+
 									ID3D11SamplerState* sampler = m_context->GetSampler(s.s);
-									m_context->context->PSSetSamplers((UINT) j, 1, &sampler);
+									m_context->context->PSSetSamplers((UINT) samplers[i][j].binding, 1, &sampler);
 								}
 							}
 						}
@@ -850,7 +950,7 @@ namespace filament
 			}
 			m_context->context->IASetPrimitiveTopology(primitive_type);
 
-			if (primitive->input_layout == nullptr)
+			if (program->input_layout == nullptr)
 			{
 				auto get_format = [](ElementType type) {
 					switch (type)
@@ -884,10 +984,10 @@ namespace filament
 					(UINT) input_descs.size(),
 					program->vertex_binary->GetBufferPointer(),
 					program->vertex_binary->GetBufferSize(),
-					&primitive->input_layout);
+					&program->input_layout);
 				assert(SUCCEEDED(hr));
 			}
-			m_context->context->IASetInputLayout(primitive->input_layout);
+			m_context->context->IASetInputLayout(program->input_layout);
 
 			m_context->context->DrawIndexed(primitive->count, primitive->offset, 0);
 		}

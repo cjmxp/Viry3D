@@ -182,11 +182,13 @@ namespace filament
 				const char* target = nullptr;
 				if (type == Program::Shader::VERTEX)
 				{
-					target = "vs_4_0_level_9_3";
+					//target = "vs_4_0_level_9_3";
+					target = "vs_4_0";
 				}
 				else if (type == Program::Shader::FRAGMENT)
 				{
-					target = "ps_4_0_level_9_3";
+					//target = "ps_4_0_level_9_3";
+					target = "ps_4_0";
 				}
 
 				ID3DBlob* binary = nullptr;
@@ -236,6 +238,8 @@ namespace filament
 
 				SAFE_RELEASE(error);
 			}
+
+			info = std::move(program);
 		}
 
 		D3D11Program::~D3D11Program()
@@ -244,6 +248,7 @@ namespace filament
 			SAFE_RELEASE(pixel_binary);
 			SAFE_RELEASE(vertex_shader);
 			SAFE_RELEASE(pixel_shader);
+			SAFE_RELEASE(input_layout);
 		}
 
 		D3D11UniformBuffer::D3D11UniformBuffer(D3D11Context* context, size_t size, BufferUsage usage):
@@ -283,7 +288,7 @@ namespace filament
 				HRESULT hr = context->context->Map(
 					buffer,
 					0,
-					D3D11_MAP_WRITE_DISCARD,
+					D3D11_MAP_WRITE_NO_OVERWRITE,
 					0,
 					&res);
 				assert(SUCCEEDED(hr));
@@ -413,18 +418,16 @@ namespace filament
 			SAFE_RELEASE(image_view);
 		}
 
-		void D3D11Texture::Update2DImage(
+		void D3D11Texture::UpdateTexture(
 			D3D11Context* context,
-			uint32_t level,
-			uint32_t x,
-			uint32_t y,
-			uint32_t width,
-			uint32_t height,
+			int layer, int level,
+			int x, int y,
+			int w, int h,
 			const PixelBufferDescriptor& data)
 		{
-			UINT subresource = D3D11CalcSubresource(level, 0, levels);
-			D3D11_BOX box = { x, y, 0, x + width, y + height, 1 };
-			UINT row_pitch = (UINT) getTextureFormatSize(format) * width;
+			UINT subresource = D3D11CalcSubresource(level, layer, levels);
+			D3D11_BOX box = { (UINT) x, (UINT) y, 0, (UINT) (x + w), (UINT) (y + h), 1 };
+			UINT row_pitch = (UINT) getTextureFormatSize(format) * w;
 
 			context->context->UpdateSubresource1(
 				texture,
@@ -436,30 +439,103 @@ namespace filament
 				D3D11_COPY_DISCARD);
 		}
 
-		void D3D11Texture::UpdateCubeImage(
+		void D3D11Texture::CopyTexture(
 			D3D11Context* context,
-			uint32_t level,
-			const PixelBufferDescriptor& data,
-			FaceOffsets face_offsets)
+			int dst_layer, int dst_level,
+			const backend::Offset3D& dst_offset,
+			const backend::Offset3D& dst_extent,
+			D3D11Texture* src,
+			int src_layer, int src_level,
+			const backend::Offset3D& src_offset,
+			const backend::Offset3D& src_extent)
 		{
-			D3D11_BOX box = { 0, 0, 0, width, height, 1 };
-			UINT row_pitch = (UINT) getTextureFormatSize(format) * width;
-			uint8_t* buffer = (uint8_t*) data.buffer;
+			assert(dst_extent.x == src_extent.x);
+			assert(dst_extent.y == src_extent.y);
+			assert(dst_extent.z == src_extent.z);
 
-			for (int i = 0; i < 6; ++i)
-			{
-				UINT subresource = D3D11CalcSubresource(level, i, levels);
-				size_t offset = face_offsets[i];
+			UINT dst_subresource = D3D11CalcSubresource(dst_level, dst_layer, levels);
+			UINT src_subresource = D3D11CalcSubresource(src_level, src_layer, levels);
+			D3D11_BOX box = {
+				(UINT) src_offset.x,
+				(UINT) src_offset.y,
+				(UINT) src_offset.z,
+				(UINT) (src_offset.x + src_extent.x),
+				(UINT) (src_offset.y + src_extent.y),
+				(UINT) (src_offset.z + src_extent.z)
+			};
 
-				context->context->UpdateSubresource1(
-					texture,
-					subresource,
-					&box,
-					&buffer[offset],
-					row_pitch,
-					0,
-					D3D11_COPY_DISCARD);
-			}
+			context->context->CopySubresourceRegion(
+				texture,
+				dst_subresource,
+				dst_offset.x,
+				dst_offset.y,
+				dst_offset.z,
+				src->texture,
+				src_subresource,
+				&box);
+		}
+
+		void D3D11Texture::CopyTextureToMemory(
+			D3D11Context* context,
+			int layer, int level,
+			const Offset3D& offset,
+			const Offset3D& extent,
+			PixelBufferDescriptor& data)
+		{
+			D3D11_TEXTURE2D_DESC1 texture_desc = { };
+			texture_desc.Width = extent.x;
+			texture_desc.Height = extent.y;
+			texture_desc.MipLevels = 1;
+			texture_desc.ArraySize = 1;
+			texture_desc.Format = context->GetTextureFormat(format);
+			texture_desc.SampleDesc.Count = 1;
+			texture_desc.Usage = D3D11_USAGE_STAGING;
+			texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+			ID3D11Texture2D1* staging_texture = nullptr;
+			HRESULT hr = context->device->CreateTexture2D1(
+				&texture_desc,
+				nullptr,
+				&staging_texture);
+			assert(SUCCEEDED(hr));
+
+			// copy
+			UINT dst_subresource = D3D11CalcSubresource(0, 0, 1);
+			UINT src_subresource = D3D11CalcSubresource(level, layer, levels);
+			D3D11_BOX box = {
+				(UINT) offset.x,
+				(UINT) offset.y,
+				(UINT) offset.z,
+				(UINT) (offset.x + extent.x),
+				(UINT) (offset.y + extent.y),
+				(UINT) (offset.z + extent.z)
+			};
+
+			context->context->CopySubresourceRegion(
+				staging_texture,
+				dst_subresource,
+				0, 0, 0,
+				texture,
+				src_subresource,
+				&box);
+
+			// map
+			D3D11_MAPPED_SUBRESOURCE res = { };
+			D3D11_MAP map_type = D3D11_MAP_READ;
+			hr = context->context->Map(
+				staging_texture,
+				dst_subresource,
+				map_type,
+				0,
+				&res);
+			assert(SUCCEEDED(hr));
+
+			uint8_t* p = (uint8_t*) res.pData;
+			memcpy(data.buffer, p, data.size);
+
+			context->context->Unmap(staging_texture, dst_subresource);
+
+			SAFE_RELEASE(staging_texture);
 		}
 
 		void D3D11Texture::GenerateMipmaps(D3D11Context* context)
@@ -529,21 +605,10 @@ namespace filament
 			if (usage == BufferUsage::DYNAMIC)
 			{
 				D3D11_MAPPED_SUBRESOURCE res = { };
-				D3D11_MAP map_type = D3D11_MAP_WRITE;
-				if (offset == 0)
-				{
-					D3D11_BUFFER_DESC buffer_desc = { };
-					buffers[index]->GetDesc(&buffer_desc);
-
-					if (data.size == buffer_desc.ByteWidth)
-					{
-						map_type = D3D11_MAP_WRITE_DISCARD;
-					}
-				}
 				HRESULT hr = context->context->Map(
 					buffers[index],
 					0,
-					map_type,
+					D3D11_MAP_WRITE_NO_OVERWRITE,
 					0,
 					&res);
 				assert(SUCCEEDED(hr));
@@ -608,20 +673,10 @@ namespace filament
 			if (usage == BufferUsage::DYNAMIC)
 			{
 				D3D11_MAPPED_SUBRESOURCE res = { };
-				D3D11_MAP map_type = D3D11_MAP_WRITE;
-				if (offset == 0)
-				{
-					size_t buffer_size = count * (size_t) elementSize;
-
-					if (data.size == buffer_size)
-					{
-						map_type = D3D11_MAP_WRITE_DISCARD;
-					}
-				}
 				HRESULT hr = context->context->Map(
 					buffer,
 					0,
-					map_type,
+					D3D11_MAP_WRITE_NO_OVERWRITE,
 					0,
 					&res);
 				assert(SUCCEEDED(hr));
@@ -652,7 +707,7 @@ namespace filament
 
 		D3D11RenderPrimitive::~D3D11RenderPrimitive()
 		{
-			SAFE_RELEASE(input_layout);
+			
 		}
 
 		void D3D11RenderPrimitive::SetBuffer(

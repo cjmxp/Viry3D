@@ -58,10 +58,12 @@ namespace filament
 			D3D11Program(D3D11Context* context, Program&& program);
 			~D3D11Program();
 
+			Program info;
 			ID3DBlob* vertex_binary = nullptr;
 			ID3DBlob* pixel_binary = nullptr;
 			ID3D11VertexShader* vertex_shader = nullptr;
 			ID3D11PixelShader* pixel_shader = nullptr;
+			ID3D11InputLayout* input_layout = nullptr;
 		};
 
 		struct D3D11UniformBuffer : public HwUniformBuffer
@@ -95,19 +97,27 @@ namespace filament
 				uint32_t depth,
 				TextureUsage usage);
 			~D3D11Texture();
-			void Update2DImage(
+			void UpdateTexture(
 				D3D11Context* context,
-				uint32_t level,
-				uint32_t x,
-				uint32_t y,
-				uint32_t width,
-				uint32_t height,
+				int layer, int level,
+				int x, int y,
+				int w, int h,
 				const PixelBufferDescriptor& data);
-			void UpdateCubeImage(
+			void CopyTexture(
 				D3D11Context* context,
-				uint32_t level,
-				const PixelBufferDescriptor& data,
-				FaceOffsets face_offsets);
+				int dst_layer, int dst_level,
+				const backend::Offset3D& dst_offset,
+				const backend::Offset3D& dst_extent,
+				D3D11Texture* src,
+				int src_layer, int src_level,
+				const backend::Offset3D& src_offset,
+				const backend::Offset3D& src_extent);
+			void CopyTextureToMemory(
+				D3D11Context* context,
+				int layer, int level,
+				const Offset3D& offset,
+				const Offset3D& extent,
+				PixelBufferDescriptor& data);
 			void GenerateMipmaps(D3D11Context* context);
 
 			ID3D11Texture2D1* texture = nullptr;
@@ -171,7 +181,6 @@ namespace filament
 
 			VertexBufferHandle vertex_buffer;
 			IndexBufferHandle index_buffer;
-			ID3D11InputLayout* input_layout = nullptr;
 			uint32_t enabled_attributes = 0;
 		};
 	}

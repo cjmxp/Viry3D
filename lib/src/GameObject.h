@@ -30,8 +30,9 @@ namespace Viry3D
 		static Ref<GameObject> Create(const String& name);
 		static void Destroy(Ref<GameObject>& obj);
         virtual ~GameObject();
-        template <class T> Ref<T> AddComponent();
+        template <class T, typename ...ARGS> Ref<T> AddComponent(ARGS... args);
         template <class T> Ref<T> GetComponent() const;
+		template <class T> Vector<Ref<T>> GetComponentsInChildren() const;
         void RemoveComponent(const Ref<Component>& com);
         const Ref<Transform>& GetTransform() const { return m_transform; }
         int GetLayer() const { return m_layer; }
@@ -59,10 +60,10 @@ namespace Viry3D
         bool m_is_active_in_tree;
     };
     
-    template <class T>
-    Ref<T> GameObject::AddComponent()
+    template <class T, typename ...ARGS>
+    Ref<T> GameObject::AddComponent(ARGS... args)
     {
-        Ref<T> com = RefMake<T>();
+        Ref<T> com = RefMake<T>(args...);
         
         auto is_transform = RefCast<Transform>(com);
         if (m_transform && is_transform)
@@ -102,4 +103,43 @@ namespace Viry3D
         
         return Ref<T>();
     }
+
+	template <class T>
+	Vector<Ref<T>> GameObject::GetComponentsInChildren() const
+	{
+		Vector<Ref<T>> coms;
+
+		for (int i = 0; i < m_added_components.Size(); ++i)
+		{
+			auto& com = m_added_components[i];
+			auto t = RefCast<T>(com);
+			if (t)
+			{
+				coms.Add(t);
+			}
+		}
+
+		for (int i = 0; i < m_components.Size(); ++i)
+		{
+			auto& com = m_components[i];
+			auto t = RefCast<T>(com);
+			if (t)
+			{
+				coms.Add(t);
+			}
+		}
+
+		int child_count = this->GetTransform()->GetChildCount();
+		for (int i = 0; i < child_count; ++i)
+		{
+			auto child = this->GetTransform()->GetChild(i);
+			Vector<Ref<T>> child_coms = child->GetGameObject()->GetComponentsInChildren<T>();
+			for (int j = 0; j < child_coms.Size(); ++j)
+			{
+				coms.Add(child_coms[j]);
+			}
+		}
+
+		return coms;
+	}
 }

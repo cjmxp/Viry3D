@@ -23,7 +23,17 @@ namespace Viry3D
 {
     List<Renderer*> Renderer::m_renderers;
     
+	void Renderer::PrepareAll()
+	{
+		for (auto i : m_renderers)
+		{
+			i->Prepare();
+		}
+	}
+
     Renderer::Renderer():
+		m_cast_shadow(false),
+		m_recieve_shadow(false),
         m_lightmap_scale_offset(1, 1, 0, 0),
         m_lightmap_index(-1)
     {
@@ -64,7 +74,17 @@ namespace Viry3D
     {
         m_materials = materials;
     }
+
+	void Renderer::EnableCastShadow(bool enable)
+	{
+		m_cast_shadow = enable;
+	}
     
+	void Renderer::EnableRecieveShadow(bool enable)
+	{
+		m_recieve_shadow = enable;
+	}
+
     void Renderer::SetLightmapIndex(int index)
     {
         m_lightmap_index = index;
@@ -80,9 +100,20 @@ namespace Viry3D
         return Vector<filament::backend::RenderPrimitiveHandle>();
     }
 
-	void Renderer::PrepareRender()
+	void Renderer::Prepare()
 	{
 		auto& driver = Engine::Instance()->GetDriverApi();
+		const auto& materials = this->GetMaterials();
+
+		for (int i = 0; i < materials.Size(); ++i)
+		{
+			auto& material = materials[i];
+			if (material)
+			{
+				material->Prepare();
+			}
+		}
+
 		if (!m_transform_uniform_buffer)
 		{
 			m_transform_uniform_buffer = driver.createUniformBuffer(sizeof(RendererUniforms), filament::backend::BufferUsage::DYNAMIC);
@@ -91,7 +122,7 @@ namespace Viry3D
 		RendererUniforms renderer_uniforms;
 		renderer_uniforms.model_matrix = this->GetTransform()->GetLocalToWorldMatrix();
 		renderer_uniforms.lightmap_scale_offset = m_lightmap_scale_offset;
-		renderer_uniforms.lightmap_index = m_lightmap_index;
+		renderer_uniforms.lightmap_index = Vector4((float) m_lightmap_index);
 
 		void* buffer = driver.allocate(sizeof(RendererUniforms));
 		Memory::Copy(buffer, &renderer_uniforms, sizeof(RendererUniforms));

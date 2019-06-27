@@ -22,6 +22,7 @@
 #include "Renderer.h"
 #include "Material.h"
 #include "SkinnedMeshRenderer.h"
+#include "Light.h"
 
 namespace Viry3D
 {
@@ -30,6 +31,12 @@ namespace Viry3D
 
 	void Camera::RenderAll()
 	{
+		const auto& lights = Light::GetLights();
+		for (auto i : lights)
+		{
+			i->Prepare();
+		}
+
 		if (m_cameras_order_dirty)
 		{
 			m_cameras_order_dirty = false;
@@ -42,7 +49,7 @@ namespace Viry3D
 		{
             List<Renderer*> renderers;
             i->CullRenderers(Renderer::GetRenderers(), renderers);
-            i->Prepare(renderers);
+			i->UpdateViewUniforms();
 			i->Draw(renderers);
 		}
 	}
@@ -53,6 +60,12 @@ namespace Viry3D
         {
             i->OnResize(width, height);
         }
+
+		auto& renderers = Renderer::GetRenderers();
+		for (auto i : renderers)
+		{
+			i->OnResize(width, height);
+		}
     }
     
     void Camera::OnResize(int width, int height)
@@ -94,16 +107,6 @@ namespace Viry3D
             return queue_a < queue_b;
         });
     }
-    
-    void Camera::Prepare(const List<Renderer*>& renderers)
-    {
-		this->UpdateViewUniforms();
-		
-        for (auto i : renderers)
-        {
-            this->PrepareRenderer(i);
-        }
-    }
 
 	void Camera::UpdateViewUniforms()
 	{
@@ -122,21 +125,6 @@ namespace Viry3D
 		Memory::Copy(buffer, &view_uniforms, sizeof(ViewUniforms));
 		driver.loadUniformBuffer(m_view_uniform_buffer, filament::backend::BufferDescriptor(buffer, sizeof(ViewUniforms)));
 	}
-    
-    void Camera::PrepareRenderer(Renderer* renderer)
-    {
-		renderer->PrepareRender();
-
-        const auto& materials = renderer->GetMaterials();
-        for (int i = 0; i < materials.Size(); ++i)
-        {
-            auto& material = materials[i];
-            if (material)
-            {
-                material->Prepare();
-            }
-        }
-    }
 
 	void Camera::Draw(const List<Renderer*>& renderers)
 	{
@@ -173,8 +161,8 @@ namespace Viry3D
 
 				m_render_target = driver.createRenderTarget(
 					target_flags,
-					this->GetTargetWidth(),
-					this->GetTargetHeight(),
+					target_width,
+					target_height,
 					1,
 					color,
 					depth,
@@ -271,7 +259,7 @@ namespace Viry3D
     void Camera::DrawRenderer(Renderer* renderer)
     {
         auto& driver = Engine::Instance()->GetDriverApi();
-        
+		
 		driver.bindUniformBuffer((size_t) Shader::BindingPoint::PerRenderer, renderer->GetTransformUniformBuffer());
 
         SkinnedMeshRenderer* skin = dynamic_cast<SkinnedMeshRenderer*>(renderer);
@@ -279,38 +267,87 @@ namespace Viry3D
         {
             driver.bindUniformBuffer((size_t) Shader::BindingPoint::PerRendererBones, skin->GetBonesUniformBuffer());
         }
-        
-        const auto& materials = renderer->GetMaterials();
-        for (int i = 0; i < materials.Size(); ++i)
-        {
-            auto& material = materials[i];
-            if (material)
-            {
-                filament::backend::RenderPrimitiveHandle primitive;
-                
-                auto primitives = renderer->GetPrimitives();
-                if (i < primitives.Size())
-                {
-                    primitive = primitives[i];
-                }
-                else if (primitives.Size() > 0)
-                {
-                    primitive = primitives[0];
-                }
-                
-                if (primitive)
-                {
-                    const auto& shader = material->GetShader();
-                    for (int j = 0; j < shader->GetPassCount(); ++j)
-                    {
-                        material->Apply(this, j);
-                        
-                        const auto& pipeline = shader->GetPass(j).pipeline;
-                        driver.draw(pipeline, primitive);
-                    }
-                }
-            }
-        }
+
+		auto draw = [&](bool light_add = false) {
+			const auto& materials = renderer->GetMaterials();
+			for (int i = 0; i < materials.Size(); ++i)
+			{
+				auto& material = materials[i];
+				if (material)
+				{
+					filament::backend::RenderPrimitiveHandle primitive;
+
+					auto primitives = renderer->GetPrimitives();
+					if (i < primitives.Size())
+					{
+						primitive = primitives[i];
+					}
+					else if (primitives.Size() > 0)
+					{
+						primitive = primitives[0];
+					}
+
+					if (primitive)
+					{
+						if (renderer->IsRecieveShadow())
+						{
+							material->EnableKeyword("RECIEVE_SHADOW_ON");
+						}
+
+						const auto& shader = light_add ? material->GetLightAddShader() : material->GetShader();
+						
+						material->SetScissor(this->GetTargetWidth(), this->GetTargetHeight());
+
+						for (int j = 0; j < shader->GetPassCount(); ++j)
+						{
+							bool has_light = shader->GetPass(j).light_mode == Shader::LightMode::Forward;
+							if (!has_light && light_add)
+							{
+								continue;
+							}
+
+							material->Bind(j);
+
+							const auto& pipeline = shader->GetPass(j).pipeline;
+							driver.draw(pipeline, primitive);
+						}
+					}
+				}
+			}
+		};
+
+		bool lighted = false;
+		bool light_add = false;
+		const auto& lights = Light::GetLights();
+		for (auto i : lights)
+		{
+			if ((1 << renderer->GetGameObject()->GetLayer()) & i->GetCullingMask())
+			{
+				if (i->IsShadowEnable())
+				{
+					if (i->GetViewUniformBuffer())
+					{
+						driver.bindUniformBuffer((size_t) Shader::BindingPoint::PerLightVertex, i->GetViewUniformBuffer());
+					}
+					
+					if (i->GetSamplerGroup())
+					{
+						driver.bindSamplers((size_t) Shader::BindingPoint::PerLightFragment, i->GetSamplerGroup());
+					}
+				}
+				driver.bindUniformBuffer((size_t) Shader::BindingPoint::PerLightFragment, i->GetLightUniformBuffer());
+
+				draw(light_add);
+
+				lighted = true;
+				light_add = true;
+			}
+		}
+
+		if (!lighted)
+		{
+			draw();
+		}
     }
 
 	Camera::Camera():
@@ -351,6 +388,11 @@ namespace Viry3D
 
 		m_cameras.Remove(this);
     }
+
+	void Camera::OnTransformDirty()
+	{
+		m_view_matrix_dirty = true;
+	}
 
 	void Camera::SetDepth(int depth)
 	{

@@ -36,9 +36,9 @@ namespace Viry3D
 	// per view uniforms, set by camera
 	struct ViewUniforms
 	{
-		static constexpr char* VIEW_MATRIX = "u_view_matrix";
-		static constexpr char* PROJECTION_MATRIX = "u_projection_matrix";
-		static constexpr char* CAMERA_POSITION = "u_camera_pos";
+		static constexpr const char* VIEW_MATRIX = "u_view_matrix";
+		static constexpr const char* PROJECTION_MATRIX = "u_projection_matrix";
+		static constexpr const char* CAMERA_POS = "u_camera_pos";
 
 		Matrix4x4 view_matrix;
 		Matrix4x4 projection_matrix;
@@ -48,36 +48,49 @@ namespace Viry3D
 	// per renderer uniforms, set by renderer
 	struct RendererUniforms
 	{
-		static constexpr char* MODEL_MATRIX = "u_model_matrix";
-		static constexpr char* LIGHTMAP_SCALE_OFFSET = "u_lightmap_scale_offset";
-		static constexpr char* LIGHTMAP_INDEX = "u_lightmap_index";
+		static constexpr const char* MODEL_MATRIX = "u_model_matrix";
+		static constexpr const char* LIGHTMAP_SCALE_OFFSET = "u_lightmap_scale_offset";
+		static constexpr const char* LIGHTMAP_INDEX = "u_lightmap_index";
 
 		Matrix4x4 model_matrix;
 		Vector4 lightmap_scale_offset;
-		int lightmap_index;
-		Vector3 padding; // d3d11 need constant buffer size in multiples of 16
+		Vector4 lightmap_index; // in x
 	};
 
 	// per renderer bones uniforms, set by skinned mesh renderer
 	struct SkinnedMeshRendererUniforms
 	{
-		static constexpr char* BONES = "u_bones";
-		static constexpr int BONES_VECTOR_MAX_COUNT = 210;
+		static constexpr const char* BONES = "u_bones";
+		static constexpr const int BONES_VECTOR_MAX_COUNT = 210;
 
 		Vector4 bones[BONES_VECTOR_MAX_COUNT];
+	};
+
+	// per light uniforms, set by light
+	struct LightFragmentUniforms
+	{
+		static constexpr const char* AMBIENT_COLOR = "u_ambient_color";
+		static constexpr const char* LIGHT_POS = "u_light_pos";
+		static constexpr const char* LIGHT_COLOR = "u_light_color";
+		static constexpr const char* LIGHT_ATTEN = "u_light_atten";
+		static constexpr const char* SPOT_LIGHT_DIR = "u_spot_light_dir";
+		static constexpr const char* SHADOW_PARAMS = "u_shadow_params";
+
+		Color ambient_color;
+		Vector4 light_pos;
+		Color light_color; // light type in a
+		Vector4 light_atten;
+		Vector4 spot_light_dir;
+		Vector4 shadow_params; // strength, z_bias, slope_bias, filter_radius
 	};
 
 	// per material uniforms, set by material
     struct MaterialProperty
     {
-		static constexpr char* TEXTURE = "u_texture";
-		static constexpr char* TEXTURE_SCALE_OFFSET = "u_texture_scale_offset";
-		static constexpr char* AMBIENT_COLOR = "u_ambient_color";
-		static constexpr char* LIGHT_POSITION = "u_light_pos";
-		static constexpr char* LIGHT_COLOR = "u_light_color";
-		static constexpr char* LIGHT_INTENSITY = "u_light_intensity";
-		static constexpr char* CLIP_RECT = "u_clip_rect";
-
+		static constexpr const char* TEXTURE = "u_texture";
+		static constexpr const char* TEXTURE_SCALE_OFFSET = "u_texture_scale_offset";
+		static constexpr const char* COLOR = "u_color";
+		
         enum class Type
         {
             Color,
@@ -136,6 +149,7 @@ namespace Viry3D
         Material(const Ref<Shader>& shader);
         virtual ~Material();
         const Ref<Shader>& GetShader() const { return m_shader; }
+		const Ref<Shader>& GetLightAddShader();
         int GetQueue() const;
         void SetQueue(int queue);
         const Matrix4x4* GetMatrix(const String& name) const;
@@ -151,8 +165,11 @@ namespace Viry3D
         void SetMatrixArray(const String& name, const Vector<Matrix4x4>& array);
         const Rect& GetScissorRect() const { return m_scissor_rect; }
         void SetScissorRect(const Rect& rect);
+		void EnableKeyword(const String& keyword);
+		void DisableKeyword(const String& keyword);
         void Prepare();
-        void Apply(const Camera* camera, int pass);
+        void SetScissor(int target_width, int target_height);
+		void Bind(int pass);
         
     private:
         template <class T>
@@ -195,6 +212,7 @@ namespace Viry3D
         
     private:
         Ref<Shader> m_shader;
+		Ref<Shader> m_light_add_shader;
         Ref<int> m_queue;
         Map<String, MaterialProperty> m_properties;
         Rect m_scissor_rect;

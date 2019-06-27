@@ -33,10 +33,12 @@ namespace Viry3D
 			PerView = 0,
 			PerRenderer = 1,
 			PerRendererBones = 2,
-			Lights = 3,
-			PostProcess = 4,
-			PerMaterialInstance = 5,
-			Count = 6,
+			PerMaterialVertex = 3,
+			PerMaterialFragment = 4,
+			PerLightVertex = 5,
+			PerLightFragment = 6,
+
+			Count = filament::backend::CONFIG_UNIFORM_BINDING_COUNT,
 		};
 
 		enum class AttributeLocation
@@ -62,6 +64,12 @@ namespace Viry3D
 			Overlay = 4000,
 		};
 
+		enum class LightMode
+		{
+			None = 0,
+			Forward = 1,
+		};
+
 		struct Member
 		{
 			String name;
@@ -83,33 +91,43 @@ namespace Viry3D
 			int binding;
 		};
 
+		struct SamplerGroup
+		{
+			String name;
+			int binding;
+			Vector<Sampler> samplers;
+		};
+
 		struct Pass
 		{
 			String vs;
 			String fs;
 			int queue = (int) Queue::Geometry;
+			LightMode light_mode = LightMode::None;
 			Vector<Uniform> uniforms;
-			Vector<Sampler> samplers;
+			Vector<SamplerGroup> samplers;
 			filament::backend::PipelineState pipeline;
 		};
 
         static void Init();
         static void Done();
-		static Ref<Shader> Find(const String& name, const Vector<String>& keywords = Vector<String>());
+		static Ref<Shader> Find(const String& name, const Vector<String>& keywords = Vector<String>(), bool light_add = false);
 
-        Shader(const String& name);
         virtual ~Shader();
+		const List<String>& GetKeywords() const { return m_keywords; }
 		int GetPassCount() const { return m_passes.Size(); }
 		const Pass& GetPass(int index) const { return m_passes[index]; }
         int GetQueue() const { return m_queue; }
 
 	private:
+		Shader(const String& name, bool light_add);
 		void Load(const String& src, const List<String>& keywords);
 		void Compile();
 
 	private:
 		static Map<String, Ref<Shader>> m_shaders;
 		List<String> m_keywords;
+		bool m_light_add;
 		Vector<Pass> m_passes;
 		int m_queue;
     };

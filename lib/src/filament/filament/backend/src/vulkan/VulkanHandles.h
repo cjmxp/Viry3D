@@ -116,16 +116,37 @@ struct VulkanTexture : public HwTexture {
             TextureFormat format, uint8_t samples, uint32_t w, uint32_t h, uint32_t depth,
             TextureUsage usage, VulkanStagePool& stagePool);
     ~VulkanTexture();
-    void update2DImage(const PixelBufferDescriptor& data, uint32_t width, uint32_t height,
-            int miplevel);
+	void updateTexture(
+		const PixelBufferDescriptor& data,
+		int layer, int level,
+		int x, int y,
+		int w, int h);
     void updateCubeImage(const PixelBufferDescriptor& data, const FaceOffsets& faceOffsets,
             int miplevel);
+	void copyTexture(
+		int dst_layer, int dst_level,
+		const backend::Offset3D& dst_offset,
+		const backend::Offset3D& dst_extent,
+		VulkanTexture* src,
+		int src_layer, int src_level,
+		const backend::Offset3D& src_offset,
+		const backend::Offset3D& src_extent,
+		backend::SamplerMagFilter blit_filter);
 	void generateMipmaps();
 
     // Issues a barrier that transforms the layout of the image, e.g. from a CPU-writeable
     // layout to a GPU-readable layout.
     static void transitionImageLayout(VkCommandBuffer cmdbuffer, VkImage image,
-            VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t miplevel, uint32_t layers);
+            VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseLevel, uint32_t baseLayer, uint32_t layerCount);
+	static void transitionImageLayout(
+		VkCommandBuffer cmd,
+		VkImage image,
+		VkPipelineStageFlags src_stage,
+		VkPipelineStageFlags dst_stage,
+		const VkImageSubresourceRange& subresource_range,
+		VkImageLayout old_image_layout,
+		VkImageLayout new_image_layout,
+		VkAccessFlagBits src_access_mask);
 
     VkFormat vkformat;
     VkImageView imageView = VK_NULL_HANDLE;
@@ -135,8 +156,13 @@ private:
 
     // Issues a copy from a VkBuffer to a specified miplevel in a VkImage. The given width and
     // height define a subregion within the miplevel.
-    void copyBufferToImage(VkCommandBuffer cmdbuffer, VkBuffer buffer, VkImage image,
-            uint32_t width, uint32_t height, FaceOffsets const* faceOffsets, uint32_t miplevel);
+    void copyBufferToImage(
+		VkCommandBuffer cmdbuffer,
+		VkBuffer buffer, VkImage image,
+		int layer, int level,
+		int x, int y,
+		int w, int h,
+		FaceOffsets const* faceOffsets);
 
     VulkanContext& mContext;
     VulkanStagePool& mStagePool;

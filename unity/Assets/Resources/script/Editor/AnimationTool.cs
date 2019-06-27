@@ -1,4 +1,4 @@
-﻿/*
+/*
 * Viry3D
 * Copyright 2014-2019 by Stack - stackos@qq.com
 *

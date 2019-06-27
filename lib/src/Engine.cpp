@@ -28,6 +28,9 @@
 #include "graphics/Shader.h"
 #include "graphics/Texture.h"
 #include "graphics/Camera.h"
+#include "graphics/Light.h"
+#include "graphics/Renderer.h"
+#include "ui/Font.h"
 #include "audio/AudioManager.h"
 #include "time/Time.h"
 #include <thread>
@@ -134,16 +137,19 @@ namespace Viry3D
             
             Shader::Init();
             Texture::Init();
-            AudioManager::Init();
+			Mesh::Init();
+			Font::Init();
 			Resources::Init();
+            AudioManager::Init();
 		}
 
 		void Shutdown()
 		{
-            m_scene.reset();
-            
-			Resources::Done();
             AudioManager::Done();
+            m_scene.reset();
+			Resources::Done();
+			Font::Done();
+			Mesh::Done();
             Texture::Done();
             Shader::Done();
             
@@ -229,7 +235,6 @@ namespace Viry3D
 			++m_frame_id;
 
 			auto& driver = this->GetDriverApi();
-			driver.updateStreams(&driver);
 			driver.makeCurrent(m_swap_chain, m_swap_chain);
 
 			int64_t monotonic_clock_ns(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -238,6 +243,8 @@ namespace Viry3D
 
 		void Render()
 		{
+			Renderer::PrepareAll();
+			Light::RenderShadowMaps();
 			Camera::RenderAll();
 			this->Flush();
 		}

@@ -52,6 +52,7 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
         : DriverBase(new ConcreteDispatcher<MetalDriver>()),
         mPlatform(*platform),
         mContext(new MetalContext) {
+    mContext->driverPool = [[NSAutoreleasePool alloc] init];
     mContext->device = MTLCreateSystemDefaultDevice();
     mContext->commandQueue = [mContext->device newCommandQueue];
     mContext->pipelineStateCache.setDevice(mContext->device);
@@ -71,8 +72,10 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
 }
 
 MetalDriver::~MetalDriver() noexcept {
+    [mContext->device release];
     CFRelease(mContext->textureCache);
     delete mContext->bufferPool;
+    delete mContext->blitter;
     delete mContext;
 }
 
@@ -86,9 +89,11 @@ void MetalDriver::debugCommand(const char *methodName) {
 #endif
 
 void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
+    mContext->framePool = [[NSAutoreleasePool alloc] init];
+
     id<MTLCommandBuffer> commandBuffer = acquireCommandBuffer(mContext);
     [commandBuffer addCompletedHandler:^(id <MTLCommandBuffer> buffer) {
-        mContext->resourceTracker.clearResources((__bridge MetalResourceTracker::CommandBuffer) buffer);
+        mContext->resourceTracker.clearResources(buffer);
     }];
 }
 
@@ -106,6 +111,7 @@ void MetalDriver::endFrame(uint32_t frameId) {
     }
 
     // Release resources created during frame execution- like commandBuffer and currentDrawable.
+    [mContext->framePool drain];
     mContext->bufferPool->gc();
 
     CVMetalTextureCacheFlush(mContext->textureCache, 0);
@@ -196,7 +202,7 @@ void MetalDriver::createFenceR(Handle<HwFence> fh, int dummy) {
 }
 
 void MetalDriver::createSwapChainR(Handle<HwSwapChain> sch, void* nativeWindow, uint64_t flags) {
-    auto* metalLayer = (__bridge CAMetalLayer*) nativeWindow;
+    auto* metalLayer = (CAMetalLayer*) nativeWindow;
     construct_handle<MetalSwapChain>(mHandleMap, sch, mContext->device, metalLayer);
 }
 
@@ -278,26 +284,49 @@ void MetalDriver::destroyProgram(Handle<HwProgram> ph) {
 }
 
 void MetalDriver::destroySamplerGroup(Handle<HwSamplerGroup> sbh) {
-    if (sbh) {
-        destruct_handle<MetalSamplerGroup>(mHandleMap, sbh);
+    if (!sbh) {
+        return;
     }
+    // Unbind this sampler group from our internal state.
+    auto* metalSampler = handle_cast<MetalSamplerGroup>(mHandleMap, sbh);
+    for (auto& samplerBinding : mContext->samplerBindings) {
+        if (samplerBinding == metalSampler) {
+            samplerBinding = {};
+        }
+    }
+    destruct_handle<MetalSamplerGroup>(mHandleMap, sbh);
 }
 
 void MetalDriver::destroyUniformBuffer(Handle<HwUniformBuffer> ubh) {
-    if (ubh) {
-        destruct_handle<MetalUniformBuffer>(mHandleMap, ubh);
-        for (auto& thisUniform : mContext->uniformState) {
-            if (thisUniform.ubh == ubh) {
-                thisUniform.bound = false;
-            }
+    if (!ubh) {
+        return;
+    }
+    destruct_handle<MetalUniformBuffer>(mHandleMap, ubh);
+    for (auto& thisUniform : mContext->uniformState) {
+        if (thisUniform.ubh == ubh) {
+            thisUniform.bound = false;
         }
     }
 }
 
 void MetalDriver::destroyTexture(Handle<HwTexture> th) {
-    if (th) {
-        destruct_handle<MetalTexture>(mHandleMap, th);
+    if (!th) {
+        return;
     }
+    // Unbind this texture from any sampler groups that currently reference it.
+    for (auto& samplerBinding : mContext->samplerBindings) {
+        if (!samplerBinding) {
+            continue;
+        }
+        const SamplerGroup::Sampler* samplers = samplerBinding->sb->getSamplers();
+        for (size_t i = 0; i < samplerBinding->sb->getSize(); i++) {
+            const SamplerGroup::Sampler* sampler = samplers + i;
+            if (sampler->t == th) {
+                samplerBinding->sb->setSampler(i, {{}, {}});
+            }
+        }
+    }
+    destruct_handle<MetalTexture>(mHandleMap, th);
 }
 
 void MetalDriver::destroyRenderTarget(Handle<HwRenderTarget> rth) {
@@ -324,9 +353,11 @@ void MetalDriver::terminate() {
     [oneOffBuffer waitUntilCompleted];
 
     mContext->bufferPool->reset();
+    [mContext->commandQueue release];
+    [mContext->driverPool drain];
 
     MetalExternalImage::shutdown();
-    MetalBlitter::shutdown();
+    mContext->blitter->shutdown();
 }
 
 ShaderModel MetalDriver::getShaderModel() const noexcept {
@@ -407,18 +438,110 @@ void MetalDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&
     scheduleDestroy(std::move(data));
 }
 
-void MetalDriver::update2DImage(Handle<HwTexture> th, uint32_t level, uint32_t xoffset,
-        uint32_t yoffset, uint32_t width, uint32_t height, PixelBufferDescriptor&& data) {
+void MetalDriver::updateTexture(
+    Handle<HwTexture> th,
+    int layer, int level,
+    int x, int y,
+    int w, int h,
+    PixelBufferDescriptor&& data)
+{
     auto tex = handle_cast<MetalTexture>(mHandleMap, th);
-    tex->load2DImage(level, xoffset, yoffset, width, height, data);
+    tex->updateTexture(layer, level, x, y, w, h, data);
+    scheduleDestroy(std::move(data));
+}
+    
+void MetalDriver::update2DImage(Handle<HwTexture> th, uint32_t level, uint32_t xoffset,
+        uint32_t yoffset, uint32_t width, uint32_t height, PixelBufferDescriptor&& data)
+{
+    auto tex = handle_cast<MetalTexture>(mHandleMap, th);
+    tex->updateTexture(0, level, xoffset, yoffset, width, height, data);
     scheduleDestroy(std::move(data));
 }
 
 void MetalDriver::updateCubeImage(Handle<HwTexture> th, uint32_t level,
-        PixelBufferDescriptor&& data, FaceOffsets faceOffsets) {
+        PixelBufferDescriptor&& data, FaceOffsets faceOffsets)
+{
     auto tex = handle_cast<MetalTexture>(mHandleMap, th);
-    tex->loadCubeImage(data, faceOffsets, level);
+    for (int i = 0; i < 6; ++i)
+    {
+        auto buffer = static_cast<uint8_t*>(data.buffer) + faceOffsets[i];
+        if (data.type == PixelDataType::COMPRESSED)
+        {
+            tex->updateTexture(i, level, 0, 0, tex->width >> level, tex->height >> level, PixelBufferDescriptor(buffer, data.size / 6, data.compressedFormat, data.imageSize, nullptr));
+        }
+        else
+        {
+            tex->updateTexture(i, level, 0, 0, tex->width >> level, tex->height >> level, PixelBufferDescriptor(buffer, data.size / 6, data.format, data.type));
+        }
+    }
     scheduleDestroy(std::move(data));
+}
+    
+void MetalDriver::copyTexture(
+    Handle<HwTexture> th_dst, int dst_layer, int dst_level,
+    Offset3D dst_offset,
+    Offset3D dst_extent,
+    Handle<HwTexture> th_src, int src_layer, int src_level,
+    Offset3D src_offset,
+    Offset3D src_extent,
+    SamplerMagFilter blit_filter)
+{
+    assert(src_extent.x == dst_extent.x);
+    assert(src_extent.y == dst_extent.y);
+    assert(src_extent.z == dst_extent.z);
+    
+    @autoreleasepool {
+        auto dst = handle_cast<MetalTexture>(mHandleMap, th_dst);
+        auto src = handle_cast<MetalTexture>(mHandleMap, th_src);
+        
+        id<MTLCommandBuffer> commandBuffer = nil;
+        if (mContext->currentCommandBuffer)
+        {
+            commandBuffer = mContext->currentCommandBuffer;
+        }
+        else
+        {
+            commandBuffer = [mContext->commandQueue commandBuffer];
+        }
+        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        [blitEncoder copyFromTexture:src->texture sourceSlice:src_layer sourceLevel:src_level sourceOrigin:MTLOriginMake(src_offset.x, src_offset.y, src_offset.z) sourceSize:MTLSizeMake(src_extent.x, src_extent.y, src_extent.z) toTexture:dst->texture destinationSlice:dst_layer destinationLevel:dst_level destinationOrigin:MTLOriginMake(dst_offset.x, dst_offset.y, dst_offset.z)];
+        [blitEncoder endEncoding];
+        if (commandBuffer != mContext->currentCommandBuffer)
+        {
+            [commandBuffer commit];
+        }
+    }
+}
+    
+void MetalDriver::copyTextureToMemory(
+    Handle<HwTexture> th,
+    int layer, int level,
+    Offset3D offset,
+    Offset3D extent,
+    PixelBufferDescriptor&& buffer,
+    std::function<void(const PixelBufferDescriptor&)> on_complete)
+{
+    
+}
+    
+void MetalDriver::generateMipmaps(Handle<HwTexture> th) {
+    // @autoreleasepool is used to release the one-off command buffer and encoder in case this work
+    // is done outside a frame.
+    @autoreleasepool {
+        auto tex = handle_cast<MetalTexture>(mHandleMap, th);
+        // Create a one-off command buffer to execute the blit command. Technically, we could re-use
+        // this command buffer for later rendering commands, but we'll just commit it here for
+        // simplicity.
+        id <MTLCommandBuffer> commandBuffer = [mContext->commandQueue commandBuffer];
+        id <MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        [blitEncoder generateMipmapsForTexture:tex->texture];
+        [blitEncoder endEncoding];
+        [commandBuffer commit];
+    }
+}
+
+bool MetalDriver::canGenerateMipmaps() {
+    return true;
 }
 
 void MetalDriver::setupExternalImage(void* image) {
@@ -440,26 +563,6 @@ void MetalDriver::setExternalImage(Handle<HwTexture> th, void* image) {
 
 void MetalDriver::setExternalStream(Handle<HwTexture> th, Handle<HwStream> sh) {
 
-}
-
-void MetalDriver::generateMipmaps(Handle<HwTexture> th) {
-    // @autoreleasepool is used to release the one-off command buffer and encoder in case this work
-    // is done outside a frame.
-    @autoreleasepool {
-        auto tex = handle_cast<MetalTexture>(mHandleMap, th);
-        // Create a one-off command buffer to execute the blit command. Technically, we could re-use
-        // this command buffer for later rendering commands, but we'll just commit it here for
-        // simplicity.
-        id <MTLCommandBuffer> commandBuffer = [mContext->commandQueue commandBuffer];
-        id <MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-        [blitEncoder generateMipmapsForTexture:tex->texture];
-        [blitEncoder endEncoding];
-        [commandBuffer commit];
-    }
-}
-
-bool MetalDriver::canGenerateMipmaps() {
-    return true;
 }
 
 void MetalDriver::loadUniformBuffer(Handle<HwUniformBuffer> ubh,
@@ -673,7 +776,7 @@ void MetalDriver::blit(TargetBufferFlags buffers,
                         dstRect.left >= 0 && dstRect.bottom >= 0,
             "Source and destination rects must be positive.");
 
-    id<MTLTexture> srcTexture = srcTarget->getColor();
+    id<MTLTexture> srcTexture = srcTarget->getBlitColorSource();
     id<MTLTexture> dstTexture = dstTarget->getColor();
 
     // Metal's texture coordinates have (0, 0) at the top-left of the texture, but Filament's
@@ -691,9 +794,12 @@ void MetalDriver::blit(TargetBufferFlags buffers,
     const uint8_t srcLevel = srcTarget->getColorLevel();
     const uint8_t dstLevel = dstTarget->getColorLevel();
 
-    ASSERT_PRECONDITION(srcTexture.textureType == MTLTextureType2D &&
-                        dstTexture.textureType == MTLTextureType2D,
-                        "Metal does not support blitting to/from non-2D textures.");
+    auto isBlitableTextureType = [](MTLTextureType t) {
+        return t == MTLTextureType2D || t == MTLTextureType2DMultisample;
+    };
+    ASSERT_PRECONDITION(isBlitableTextureType(srcTexture.textureType) &&
+                        isBlitableTextureType(dstTexture.textureType),
+                       "Metal does not support blitting to/from non-2D textures.");
 
     MetalBlitter::BlitArgs args;
     args.filter = filter;
@@ -708,7 +814,7 @@ void MetalDriver::blit(TargetBufferFlags buffers,
     }
 
     if (buffers & TargetBufferFlags::DEPTH) {
-        args.source.depth = srcTarget->getDepth();
+        args.source.depth = srcTarget->getBlitDepthSource();
         args.destination.depth = dstTarget->getDepth();
     }
 
@@ -834,6 +940,14 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
         samplersToBind[binding] = samplerState;
     });
 
+    // Assign a default sampler to empty slots, in case Filament hasn't bound all samplers.
+    // Metal requires all samplers referenced in shaders to be bound.
+    for (auto& sampler : samplersToBind) {
+        if (!sampler) {
+            sampler = mContext->samplerStateCache.getOrCreateState({});
+        }
+    }
+
     // Similar to uniforms, we can't tell which stage will use the textures / samplers, so bind
     // to both the vertex and fragment stages.
 
@@ -877,7 +991,6 @@ void MetalDriver::enumerateSamplerGroups(
             continue;
         }
         SamplerGroup* sb = metalSamplerGroup->sb.get();
-        assert(sb->getSize() == samplerGroup.size());
         size_t samplerIdx = 0;
         for (const auto& sampler : samplerGroup) {
             size_t bindingPoint = sampler.binding;

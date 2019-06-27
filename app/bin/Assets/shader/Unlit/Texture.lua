@@ -7,15 +7,12 @@ VK_UNIFORM_BINDING(0) uniform PerView
 {
 	mat4 u_view_matrix;
     mat4 u_projection_matrix;
-	vec4 u_camera_pos;
 };
 VK_UNIFORM_BINDING(1) uniform PerRenderer
 {
 	mat4 u_model_matrix;
-	vec4 u_lightmap_scale_offset;
-	int u_lightmap_index;
 };
-VK_UNIFORM_BINDING(5) uniform PerMaterialInstance
+VK_UNIFORM_BINDING(3) uniform PerMaterialVertex
 {
 	vec4 u_texture_scale_offset;
 };
@@ -65,11 +62,17 @@ void main()
 local fs = [[
 precision highp float;
 VK_SAMPLER_BINDING(0) uniform sampler2D u_texture;
+VK_UNIFORM_BINDING(4) uniform PerMaterialFragment
+{
+	vec4 u_color;
+};
 VK_LAYOUT_LOCATION(0) in vec2 v_uv;
 layout(location = 0) out vec4 o_color;
 void main()
 {
-	o_color = texture(u_texture, v_uv);
+	vec4 c = texture(u_texture, v_uv) * u_color;
+	c.a = 1.0;
+	o_color = c;
 }
 ]]
 
@@ -117,10 +120,6 @@ local pass = {
                     name = "u_projection_matrix",
                     size = 64,
                 },
-				{
-                    name = "u_camera_pos",
-                    size = 16,
-                },
 			},
 		},
 		{
@@ -130,14 +129,6 @@ local pass = {
 				{
 					name = "u_model_matrix",
 					size = 64,
-				},
-				{
-					name = "u_lightmap_scale_offset",
-					size = 16,
-				},
-				{
-					name = "u_lightmap_index",
-					size = 4,
 				},
 			},
 		},
@@ -152,8 +143,8 @@ local pass = {
             },
         },
 		{
-            name = "PerMaterialInstance",
-            binding = 5,
+            name = "PerMaterialVertex",
+            binding = 3,
             members = {
                 {
                     name = "u_texture_scale_offset",
@@ -161,11 +152,27 @@ local pass = {
                 },
             },
         },
+		{
+            name = "PerMaterialFragment",
+            binding = 4,
+            members = {
+                {
+                    name = "u_color",
+                    size = 16,
+                },
+            },
+        },
 	},
 	samplers = {
 		{
-			name = "u_texture",
-			binding = 0,
+			name = "PerMaterialFragment",
+			binding = 4,
+			samplers = {
+				{
+					name = "u_texture",
+					binding = 0,
+				},
+			},
 		},
 	},
 }

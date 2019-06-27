@@ -56,14 +56,14 @@ namespace Viry3D
                     break;
                 }
             }
+			m_parent.reset();
         }
         
         if (parent)
         {
             parent->m_children.Add(this->GetGameObject()->GetTransform());
+			m_parent = parent;
         }
-        
-        m_parent = parent;
         
         this->SetPosition(position);
         this->SetRotation(rotation);
@@ -141,19 +141,31 @@ namespace Viry3D
 
 	const Vector3& Transform::GetPosition()
 	{
-        this->GetLocalToWorldMatrix();
+        this->UpdateMatrix();
         
         return m_position;
 	}
     
     void Transform::SetPosition(const Vector3& pos)
     {
-        this->SetLocalPosition(this->GetWorldToLocalMatrix().MultiplyPoint3x4(pos));
+		Vector3 local_position;
+
+		auto parent = m_parent.lock();
+		if (parent)
+		{
+			local_position = parent->GetWorldToLocalMatrix().MultiplyPoint3x4(pos);
+		}
+		else
+		{
+			local_position = pos;
+		}
+
+		this->SetLocalPosition(local_position);
     }
 
 	const Quaternion& Transform::GetRotation()
 	{
-        this->GetLocalToWorldMatrix();
+        this->UpdateMatrix();
         
         return m_rotation;
 	}
@@ -177,7 +189,7 @@ namespace Viry3D
 
 	const Vector3& Transform::GetScale()
 	{
-        this->GetLocalToWorldMatrix();
+        this->UpdateMatrix();
         
         return m_scale;
 	}
@@ -202,57 +214,35 @@ namespace Viry3D
     
 	const Matrix4x4& Transform::GetLocalToWorldMatrix()
 	{
-        if (m_dirty)
-        {
-            m_dirty = false;
-            
-            auto parent = m_parent.lock();
-            if (parent)
-            {
-                m_local_to_world = parent->GetLocalToWorldMatrix() * Matrix4x4::TRS(m_local_position, m_local_rotation, m_local_scale);
-                m_position = m_local_to_world.MultiplyPoint3x4(m_local_position);
-                m_rotation = parent->GetRotation() * m_local_rotation;
-                const auto& parent_scale = parent->GetScale();
-                m_scale = Vector3(parent_scale.x * m_local_scale.x, parent_scale.y * m_local_scale.y, parent_scale.z * m_local_scale.z);
-            }
-            else
-            {
-                m_local_to_world = Matrix4x4::TRS(m_local_position, m_local_rotation, m_local_scale);
-                m_position = m_local_position;
-                m_rotation = m_local_rotation;
-                m_scale = m_local_scale;
-            }
-            
-            m_world_to_local = m_local_to_world.Inverse();
-        }
+		this->UpdateMatrix();
         
         return m_local_to_world;
 	}
 
 	const Matrix4x4& Transform::GetWorldToLocalMatrix()
 	{
-        this->GetLocalToWorldMatrix();
+        this->UpdateMatrix();
         
         return m_world_to_local;
 	}
 
 	Vector3 Transform::GetRight()
 	{
-        this->GetLocalToWorldMatrix();
+        this->UpdateMatrix();
         
         return m_local_to_world.MultiplyDirection(Vector3(1, 0, 0));
 	}
 
 	Vector3 Transform::GetUp()
 	{
-        this->GetLocalToWorldMatrix();
+        this->UpdateMatrix();
         
         return m_local_to_world.MultiplyDirection(Vector3(0, 1, 0));
 	}
 
 	Vector3 Transform::GetForward()
 	{
-        this->GetLocalToWorldMatrix();
+        this->UpdateMatrix();
         
         return m_local_to_world.MultiplyDirection(Vector3(0, 0, 1));
 	}
@@ -265,6 +255,33 @@ namespace Viry3D
 		for (auto& i : m_children)
 		{
 			i->MarkDirty();
+		}
+	}
+
+	void Transform::UpdateMatrix()
+	{
+		if (m_dirty)
+		{
+			m_dirty = false;
+
+			auto parent = m_parent.lock();
+			if (parent)
+			{
+				m_local_to_world = parent->GetLocalToWorldMatrix() * Matrix4x4::TRS(m_local_position, m_local_rotation, m_local_scale);
+				m_position = parent->GetLocalToWorldMatrix().MultiplyPoint3x4(m_local_position);
+				m_rotation = parent->GetRotation() * m_local_rotation;
+				const auto& parent_scale = parent->GetScale();
+				m_scale = Vector3(parent_scale.x * m_local_scale.x, parent_scale.y * m_local_scale.y, parent_scale.z * m_local_scale.z);
+			}
+			else
+			{
+				m_local_to_world = Matrix4x4::TRS(m_local_position, m_local_rotation, m_local_scale);
+				m_position = m_local_position;
+				m_rotation = m_local_rotation;
+				m_scale = m_local_scale;
+			}
+
+			m_world_to_local = m_local_to_world.Inverse();
 		}
 	}
 }

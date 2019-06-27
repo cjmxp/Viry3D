@@ -345,6 +345,16 @@ DECL_DRIVER_API_2(updateSamplerGroup,
         backend::SamplerGroupHandle, ubh,
         backend::SamplerGroup&&, samplerGroup)
 
+DECL_DRIVER_API_8(updateTexture,
+        backend::TextureHandle, th,
+		int, layer,
+		int, level,
+		int, x,
+		int, y,
+		int, w,
+		int, h,
+        backend::PixelBufferDescriptor&&, data)
+
 DECL_DRIVER_API_7(update2DImage,
         backend::TextureHandle, th,
         uint32_t, level,
@@ -359,6 +369,25 @@ DECL_DRIVER_API_4(updateCubeImage,
         uint32_t, level,
         backend::PixelBufferDescriptor&&, data,
         backend::FaceOffsets, faceOffsets)
+
+DECL_DRIVER_API_11(copyTexture,
+		backend::TextureHandle, th_dst,
+		int, dst_layer, int, dst_level,
+        backend::Offset3D, dst_offset,
+        backend::Offset3D, dst_extent,
+		backend::TextureHandle, th_src,
+		int, src_layer, int, src_level,
+        backend::Offset3D, src_offset,
+        backend::Offset3D, src_extent,
+		backend::SamplerMagFilter, blit_filter);
+
+DECL_DRIVER_API_7(copyTextureToMemory,
+		backend::TextureHandle, th,
+		int, layer, int, level,
+        backend::Offset3D, offset,
+        backend::Offset3D, extent,
+		backend::PixelBufferDescriptor&&, buffer,
+		std::function<void(const backend::PixelBufferDescriptor&)>, on_complete);
 
 DECL_DRIVER_API_1(generateMipmaps,
         backend::TextureHandle, th)

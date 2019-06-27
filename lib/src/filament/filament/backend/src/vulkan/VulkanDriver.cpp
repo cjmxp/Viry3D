@@ -242,6 +242,14 @@ void VulkanDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
         return;
     }
 
+	SwapContext& swap = getSwapContext(mContext);
+	auto& cmdfence = swap.commands.fence;
+	if (cmdfence && cmdfence->submitted) {
+		VkResult result = vkWaitForFences(mContext.device, 1, &cmdfence->fence, VK_FALSE, UINT64_MAX);
+		ASSERT_POSTCONDITION(result == VK_SUCCESS, "vkWaitForFences error.");
+		cmdfence->submitted = false;
+	}
+
     // After each command buffer acquisition, we know that the previous submission of the acquired
     // command buffer has finished, so we can decrement the refcount for each of its referenced
     // resources.
@@ -283,13 +291,13 @@ void VulkanDriver::flush(int) {
 }
 
 void VulkanDriver::createSamplerGroupR(Handle<HwSamplerGroup> sbh, size_t count) {
-    construct_handle<VulkanSamplerGroup>(mHandleMap, sbh, mContext, count);
+    construct_handle<VulkanSamplerGroup>(mHandleMap, sbh, mContext, (uint32_t) count);
 }
 
 void VulkanDriver::createUniformBufferR(Handle<HwUniformBuffer> ubh, size_t size,
         BufferUsage usage) {
     auto uniformBuffer = construct_handle<VulkanUniformBuffer>(mHandleMap, ubh, mContext,
-            mStagePool, size, usage);
+            mStagePool, (uint32_t) size, usage);
     mDisposer.createDisposable(uniformBuffer, [this, ubh] () {
         destruct_handle<VulkanUniformBuffer>(mHandleMap, ubh);
     });
@@ -610,22 +618,32 @@ bool VulkanDriver::isFrameTimeSupported() {
 void VulkanDriver::updateVertexBuffer(Handle<HwVertexBuffer> vbh, size_t index,
         BufferDescriptor&& p, uint32_t byteOffset) {
     auto& vb = *handle_cast<VulkanVertexBuffer>(mHandleMap, vbh);
-    vb.buffers[index]->loadFromCpu(p.buffer, byteOffset, p.size);
+    vb.buffers[index]->loadFromCpu(p.buffer, byteOffset, (uint32_t) p.size);
     scheduleDestroy(std::move(p));
 }
 
 void VulkanDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& p,
         uint32_t byteOffset) {
     auto& ib = *handle_cast<VulkanIndexBuffer>(mHandleMap, ibh);
-    ib.buffer->loadFromCpu(p.buffer, byteOffset, p.size);
+    ib.buffer->loadFromCpu(p.buffer, byteOffset, (uint32_t) p.size);
     scheduleDestroy(std::move(p));
+}
+
+void VulkanDriver::updateTexture(
+	Handle<HwTexture> th,
+	int layer, int level,
+	int x, int y,
+	int w, int h,
+	PixelBufferDescriptor&& data)
+{
+	handle_cast<VulkanTexture>(mHandleMap, th)->updateTexture(data, layer, level, x, y, w, h);
+	scheduleDestroy(std::move(data));
 }
 
 void VulkanDriver::update2DImage(Handle<HwTexture> th,
         uint32_t level, uint32_t xoffset, uint32_t yoffset, uint32_t width, uint32_t height,
         PixelBufferDescriptor&& data) {
-    assert(xoffset == 0 && yoffset == 0 && "Offsets not yet supported.");
-    handle_cast<VulkanTexture>(mHandleMap, th)->update2DImage(data, width, height, level);
+    handle_cast<VulkanTexture>(mHandleMap, th)->updateTexture(data, 0, level, xoffset, yoffset, width, height);
     scheduleDestroy(std::move(data));
 }
 
@@ -633,6 +651,37 @@ void VulkanDriver::updateCubeImage(Handle<HwTexture> th, uint32_t level,
         PixelBufferDescriptor&& data, FaceOffsets faceOffsets) {
     handle_cast<VulkanTexture>(mHandleMap, th)->updateCubeImage(data, faceOffsets, level);
     scheduleDestroy(std::move(data));
+}
+
+void VulkanDriver::copyTexture(
+	Handle<HwTexture> th_dst, int dst_layer, int dst_level,
+	Offset3D dst_offset,
+	Offset3D dst_extent,
+	Handle<HwTexture> th_src, int src_layer, int src_level,
+	Offset3D src_offset,
+	Offset3D src_extent,
+	SamplerMagFilter blit_filter)
+{
+	VulkanTexture* dst = handle_cast<VulkanTexture>(mHandleMap, th_dst);
+	VulkanTexture* src = handle_cast<VulkanTexture>(mHandleMap, th_src);
+	dst->copyTexture(
+		dst_layer, dst_level,
+		dst_offset, dst_extent,
+		src,
+		src_layer, src_level,
+		src_offset, src_extent,
+		blit_filter);
+}
+
+void VulkanDriver::copyTextureToMemory(
+	Handle<HwTexture> th,
+	int layer, int level,
+	Offset3D offset,
+	Offset3D extent,
+	PixelBufferDescriptor&& buffer,
+	std::function<void(const PixelBufferDescriptor&)> on_complete)
+{
+
 }
 
 void VulkanDriver::setupExternalImage(void* image) {
@@ -699,6 +748,19 @@ void VulkanDriver::beginRenderPass(Handle<HwRenderTarget> rth,
     VkImageLayout finalLayout;
     if (!rt->isOffscreen()) {
         finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+		if ((params.flags.clear & TargetBufferFlags::COLOR) == 0 &&
+			(params.flags.discardStart & TargetBufferFlags::COLOR) == 0) {
+			VulkanTexture::transitionImageLayout(
+				swapContext.commands.cmdbuffer,
+				color.image,
+				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+				VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_ACCESS_MEMORY_READ_BIT);
+		}
     } else if (depthOnly) {
         finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     } else {
@@ -984,11 +1046,11 @@ void VulkanDriver::blit(TargetBufferFlags buffers,
     auto vkblit = [=](VkCommandBuffer cmdbuffer) {
         VkImage srcImage = srcTarget->getColor().image;
         VulkanTexture::transitionImageLayout(cmdbuffer, srcImage, VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcLevel, 1);
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcLevel, 0, 1);
 
         VkImage dstImage = dstTarget->getColor().image;
         VulkanTexture::transitionImageLayout(cmdbuffer, dstImage, VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstLevel, 1);
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstLevel, 0, 1);
 
         // TODO: Issue vkCmdResolveImage for MSAA targets.
 
@@ -997,7 +1059,7 @@ void VulkanDriver::blit(TargetBufferFlags buffers,
                 filter == SamplerMagFilter::NEAREST ? VK_FILTER_NEAREST : VK_FILTER_LINEAR);
 
         VulkanTexture::transitionImageLayout(cmdbuffer, dstImage, VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, dstLevel, 1);
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, dstLevel, 0, 1);
     };
 
     if (!mContext.currentCommands) {
@@ -1100,7 +1162,7 @@ void VulkanDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> r
             VkSampler vksampler = mSamplerCache.getSampler(samplerParams);
             const auto* texture = handle_const_cast<VulkanTexture>(mHandleMap, boundSampler->t);
             mDisposer.acquire(texture, commands->resources);
-            mBinder.bindSampler(bindingPoint, {
+            mBinder.bindSampler((uint32_t) bindingPoint, {
                 vksampler,
                 texture->imageView,
                 samplerParams.depthStencil ?

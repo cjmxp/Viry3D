@@ -33,7 +33,9 @@ namespace Viry3D
         
         m_samplers.Resize(shader->GetPassCount());
 
+        this->SetTexture(MaterialProperty::TEXTURE, Texture::GetSharedWhiteTexture());
 		this->SetVector(MaterialProperty::TEXTURE_SCALE_OFFSET, Vector4(1, 1, 0, 0));
+		this->SetColor(MaterialProperty::COLOR, Color(1, 1, 1, 1));
     }
     
     Material::~Material()
@@ -64,6 +66,23 @@ namespace Viry3D
         m_samplers.Clear();
     }
     
+	const Ref<Shader>& Material::GetLightAddShader()
+	{
+		if (!m_light_add_shader)
+		{
+			auto& keywords = m_shader->GetKeywords();
+			Vector<String> new_keywords;
+			for (auto& i : keywords)
+			{
+				new_keywords.Add(i);
+			}
+			new_keywords.Add("LIGHT_ADD_ON");
+			m_light_add_shader = Shader::Find(m_shader->GetName(), new_keywords, true);
+		}
+
+		return m_light_add_shader;
+	}
+
     int Material::GetQueue() const
     {
         if (m_queue)
@@ -193,6 +212,36 @@ namespace Viry3D
         m_scissor_rect = rect;
     }
     
+	void Material::EnableKeyword(const String& keyword)
+	{
+		auto& keywords = m_shader->GetKeywords();
+		if (!keywords.Contains(keyword))
+		{
+			Vector<String> new_keywords;
+			for (auto& i : keywords)
+			{
+				new_keywords.Add(i);
+			}
+			new_keywords.Add(keyword);
+			m_shader = Shader::Find(m_shader->GetName(), new_keywords);
+		}
+	}
+
+	void Material::DisableKeyword(const String& keyword)
+	{
+		auto& keywords = m_shader->GetKeywords();
+		if (keywords.Contains(keyword))
+		{
+			Vector<String> new_keywords;
+			for (auto& i : keywords)
+			{
+				new_keywords.Add(i);
+			}
+			new_keywords.Remove(keyword);
+			m_shader = Shader::Find(m_shader->GetName(), new_keywords);
+		}
+	}
+
     void Material::Prepare()
     {
         for (auto& i : m_properties)
@@ -252,16 +301,7 @@ namespace Viry3D
                 for (int j = 0; j < sampler_group.samplers.Size(); ++j)
                 {
                     const auto& sampler = sampler_group.samplers[j];
-                    
-                    if (sampler.texture)
-                    {
-                        samplers.setSampler(sampler.binding, sampler.texture->GetTexture(), sampler.texture->GetSampler());
-                    }
-                    else
-                    {
-                        const auto& default_texture = Texture::GetSharedWhiteTexture();
-                        samplers.setSampler(sampler.binding, default_texture->GetTexture(), default_texture->GetSampler());
-                    }
+					samplers.setSampler(j, sampler.texture->GetTexture(), sampler.texture->GetSampler());
                 }
                 driver.updateSamplerGroup(sampler_group.sampler_group, std::move(samplers));
             }
@@ -324,56 +364,69 @@ namespace Viry3D
             
             for (int j = 0; j < pass.samplers.Size(); ++j)
             {
-                const auto& sampler = pass.samplers[j];
+                const auto& group = pass.samplers[j];
                 
-                if (name == sampler.name)
-                {
-                    auto& sampler_group = m_samplers[i];
-                    
-                    if (!sampler_group.sampler_group)
-                    {
-                        sampler_group.sampler_group = driver.createSamplerGroup(pass.samplers.Size());
-                        sampler_group.samplers.Resize(pass.samplers.Size());
-                    }
-                    
-                    sampler_group.samplers[j].binding = sampler.binding;
-                    sampler_group.samplers[j].texture = texture;
-                    
-                    sampler_group.dirty = true;
-                }
+				if (group.binding == (int) Shader::BindingPoint::PerMaterialFragment)
+				{
+					for (int k = 0; k < group.samplers.Size(); ++k)
+					{
+						const auto& sampler = group.samplers[k];
+
+						if (name == sampler.name)
+						{
+							auto& sampler_group = m_samplers[i];
+
+							if (!sampler_group.sampler_group)
+							{
+								sampler_group.sampler_group = driver.createSamplerGroup(group.samplers.Size());
+								sampler_group.samplers.Resize(group.samplers.Size());
+							}
+
+							sampler_group.samplers[k].binding = sampler.binding;
+							sampler_group.samplers[k].texture = texture;
+
+							sampler_group.dirty = true;
+						}
+					}
+
+					break;
+				}
             }
         }
     }
     
-    void Material::Apply(const Camera* camera, int pass)
+    void Material::SetScissor(int target_width, int target_height)
     {
-        auto& driver = Engine::Instance()->GetDriverApi();
+		auto& driver = Engine::Instance()->GetDriverApi();
         
-        // set scissor
-        int target_width = camera->GetTargetWidth();
-        int target_height = camera->GetTargetHeight();
-        int32_t scissor_left = (int32_t) (m_scissor_rect.x * target_width);
-        int32_t scissor_bottom = (int32_t) ((1.0f - (m_scissor_rect.y + m_scissor_rect.h)) * target_height);
-        uint32_t scissor_width = (uint32_t) (m_scissor_rect.w * target_width);
-        uint32_t scissor_height = (uint32_t) (m_scissor_rect.h * target_height);
-        driver.setViewportScissor(scissor_left, scissor_bottom, scissor_width, scissor_height);
-        
-        const auto& unifrom_buffers = m_unifrom_buffers[pass];
-        const auto& samplers = m_samplers[pass];
-        
-        // bind uniforms
-        for (int i = 0; i < unifrom_buffers.Size(); ++i)
-        {
-            if (unifrom_buffers[i].uniform_buffer)
-            {
-                driver.bindUniformBuffer((size_t) i, unifrom_buffers[i].uniform_buffer);
-            }
-        }
-        
-        // bind samplers
-        if (samplers.sampler_group)
-        {
-            driver.bindSamplers((size_t) Shader::BindingPoint::PerMaterialInstance, samplers.sampler_group);
-        }
+		// set scissor
+		int32_t scissor_left = (int32_t) (m_scissor_rect.x * target_width);
+		int32_t scissor_bottom = (int32_t) ((1.0f - (m_scissor_rect.y + m_scissor_rect.h)) * target_height);
+		uint32_t scissor_width = (uint32_t) (m_scissor_rect.w * target_width);
+		uint32_t scissor_height = (uint32_t) (m_scissor_rect.h * target_height);
+		driver.setViewportScissor(scissor_left, scissor_bottom, scissor_width, scissor_height);
     }
+
+	void Material::Bind(int pass)
+	{
+		auto& driver = Engine::Instance()->GetDriverApi();
+
+		const auto& unifrom_buffers = m_unifrom_buffers[pass];
+		const auto& samplers = m_samplers[pass];
+
+		// bind uniforms
+		for (int i = 0; i < unifrom_buffers.Size(); ++i)
+		{
+			if (unifrom_buffers[i].uniform_buffer)
+			{
+				driver.bindUniformBuffer((size_t) i, unifrom_buffers[i].uniform_buffer);
+			}
+		}
+
+		// bind samplers
+		if (samplers.sampler_group)
+		{
+			driver.bindSamplers((size_t) Shader::BindingPoint::PerMaterialFragment, samplers.sampler_group);
+		}
+	}
 }
