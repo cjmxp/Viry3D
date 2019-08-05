@@ -761,11 +761,25 @@ void VulkanDriver::beginRenderPass(Handle<HwRenderTarget> rth,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				VK_ACCESS_MEMORY_READ_BIT);
 		}
-    } else if (depthOnly) {
-        finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     } else {
         finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
+
+	if (hasDepth && (params.flags.clear & TargetBufferFlags::DEPTH) == 0)
+	{
+		if ((params.flags.discardStart & TargetBufferFlags::DEPTH) == 0)
+		{
+			VulkanTexture::transitionImageLayout(
+				swapContext.commands.cmdbuffer,
+				depth.image,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				{ VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 },
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_ACCESS_SHADER_READ_BIT);
+		}
+	}
 
     VkRenderPass renderPass = mFramebufferCache.getRenderPass({
         finalLayout,
@@ -1147,7 +1161,6 @@ void VulkanDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> r
             continue;
         }
         SamplerGroup* sb = vksb->sb.get();
-        assert(sb->getSize() == samplerGroup.size());
         size_t samplerIdx = 0;
         for (const auto& sampler : samplerGroup) {
             size_t bindingPoint = sampler.binding;

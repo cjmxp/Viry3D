@@ -32,6 +32,7 @@ namespace Viry3D
         virtual ~GameObject();
         template <class T, typename ...ARGS> Ref<T> AddComponent(ARGS... args);
         template <class T> Ref<T> GetComponent() const;
+		template <class T> Vector<Ref<T>> GetComponents() const;
 		template <class T> Vector<Ref<T>> GetComponentsInChildren() const;
         void RemoveComponent(const Ref<Component>& com);
         const Ref<Transform>& GetTransform() const { return m_transform; }
@@ -41,7 +42,8 @@ namespace Viry3D
 		void SetActive(bool active);
 		bool IsActiveInTree() const { return m_is_active_in_tree; }
 		void Update();
-		
+		void LateUpdate();
+        
 	private:
 		GameObject(const String& name);
         void BindComponent(const Ref<Component>& com) const;
@@ -105,7 +107,7 @@ namespace Viry3D
     }
 
 	template <class T>
-	Vector<Ref<T>> GameObject::GetComponentsInChildren() const
+	Vector<Ref<T>> GameObject::GetComponents() const
 	{
 		Vector<Ref<T>> coms;
 
@@ -128,6 +130,14 @@ namespace Viry3D
 				coms.Add(t);
 			}
 		}
+
+		return coms;
+	}
+
+	template <class T>
+	Vector<Ref<T>> GameObject::GetComponentsInChildren() const
+	{
+		Vector<Ref<T>> coms = this->GetComponents<T>();
 
 		int child_count = this->GetTransform()->GetChildCount();
 		for (int i = 0; i < child_count; ++i)

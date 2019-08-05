@@ -29,12 +29,18 @@ namespace Viry3D
 {
 	class Texture;
     class Renderer;
+	class RenderTarget;
+	class Material;
+	class Mesh;
 
     class Camera : public Component
     {
     public:
+		static void Init();
+		static void Done();
 		static void RenderAll();
         static void OnResizeAll(int width, int height);
+		static void Blit(const Ref<RenderTarget>& src, const Ref<RenderTarget>& dst, const Ref<Material>& mat = Ref<Material>(), int pass = -1);
 		Camera();
         virtual ~Camera();
 		int GetDepth() const { return m_depth; }
@@ -49,6 +55,8 @@ namespace Viry3D
 		void SetViewportRect(const Rect& rect);
 		float GetFieldOfView() const { return m_field_of_view; }
 		void SetFieldOfView(float fov);
+        float GetAspect() const;
+        void SetAspect(float aspect);
 		float GetNearClip() const { return m_near_clip; }
 		void SetNearClip(float clip);
 		float GetFarClip() const { return m_far_clip; }
@@ -76,16 +84,22 @@ namespace Viry3D
 		void UpdateViewUniforms();
 		void Draw(const List<Renderer*>& renderers);
         void DrawRenderer(Renderer* renderer);
+		bool HasPostProcessing();
+		void PostProcessing();
 
 	private:
 		static List<Camera*> m_cameras;
+		static Camera* m_current_camera;
 		static bool m_cameras_order_dirty;
+		static Ref<Mesh> m_quad_mesh;
+		static Ref<Material> m_blit_material;
 		int m_depth;
         uint32_t m_culling_mask;
 		CameraClearFlags m_clear_flags;
 		Color m_clear_color;
 		Rect m_viewport_rect;
 		float m_field_of_view;
+        float m_aspect;
 		float m_near_clip;
 		float m_far_clip;
 		bool m_orthographic;
@@ -98,6 +112,7 @@ namespace Viry3D
 		bool m_projection_matrix_external;
 		Ref<Texture> m_render_target_color;
 		Ref<Texture> m_render_target_depth;
+		Ref<RenderTarget> m_post_processing_target;
 		filament::backend::UniformBufferHandle m_view_uniform_buffer;
 		filament::backend::RenderTargetHandle m_render_target;
     };

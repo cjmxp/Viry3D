@@ -39,10 +39,12 @@ namespace Viry3D
 		static constexpr const char* VIEW_MATRIX = "u_view_matrix";
 		static constexpr const char* PROJECTION_MATRIX = "u_projection_matrix";
 		static constexpr const char* CAMERA_POS = "u_camera_pos";
+		static constexpr const char* TIME = "u_time";
 
 		Matrix4x4 view_matrix;
 		Matrix4x4 projection_matrix;
 		Vector4 camera_pos;
+		Vector4 time;
 	};
 
 	// per renderer uniforms, set by renderer
@@ -167,7 +169,7 @@ namespace Viry3D
         void SetScissorRect(const Rect& rect);
 		void EnableKeyword(const String& keyword);
 		void DisableKeyword(const String& keyword);
-        void Prepare();
+        void Prepare(int pass = -1);
         void SetScissor(int target_width, int target_height);
 		void Bind(int pass);
         

@@ -68,6 +68,8 @@ namespace Viry3D
         this->SetPosition(position);
         this->SetRotation(rotation);
         this->SetScale(scale);
+
+		this->GetGameObject()->SetActive(this->GetGameObject()->IsActiveSelf());
 	}
 
 	Ref<Transform> Transform::Find(const String& path) const
@@ -85,16 +87,25 @@ namespace Viry3D
 		{
 			bool find_child = false;
 
-			for (int j = 0; j < p->GetChildCount(); ++j)
-			{
-				if (p->GetChild(j)->GetName() == layers[i])
-				{
-					find_child = true;
-					find = p->GetChild(j);
-					p = find.get();
-					break;
-				}
-			}
+            if (layers[i] == "..")
+            {
+                find_child = true;
+                find = p->GetParent();
+                p = find.get();
+            }
+			else
+            {
+                for (int j = 0; j < p->GetChildCount(); ++j)
+                {
+                    if (layers[i] == p->GetChild(j)->GetName())
+                    {
+                        find_child = true;
+                        find = p->GetChild(j);
+                        p = find.get();
+                        break;
+                    }
+                }
+            }
 
 			if (!find_child)
 			{

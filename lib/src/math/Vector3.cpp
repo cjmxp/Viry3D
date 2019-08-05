@@ -59,7 +59,12 @@ namespace Viry3D
 			z = z * inv;
 		}
 	}
-
+    
+    Vector3 Vector3::Normalized() const
+    {
+        return Vector3::Normalize(*this);
+    }
+    
 	Vector3 Vector3::Normalize(const Vector3& value)
 	{
 		Vector3 v = value;
@@ -154,6 +159,17 @@ namespace Viry3D
 		*this = *this * v;
 		return *this;
 	}
+    
+    Vector3 Vector3::operator /(float v) const
+    {
+        return Vector3(x / v, y / v, z / v);
+    }
+    
+    Vector3 Vector3::operator /=(float v)
+    {
+        *this = *this / v;
+        return *this;
+    }
 
 	bool Vector3::operator !=(const Vector3& v) const
 	{
@@ -167,9 +183,14 @@ namespace Viry3D
 			Mathf::FloatEqual(v.z, z);
 	}
 
+    float Vector3::Dot(const Vector3& a, const Vector3& b)
+    {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+    
 	float Vector3::Dot(const Vector3& v) const
 	{
-		return x * v.x + y * v.y + z * v.z;
+        return Vector3::Dot(*this, v);
 	}
 
 	String Vector3::ToString() const
@@ -199,4 +220,9 @@ namespace Viry3D
 	{
 		return v.SqrMagnitude();
 	}
+    
+    float Vector3::Distance(const Vector3& a, const Vector3& b)
+    {
+        return (a - b).Magnitude();
+    }
 }
